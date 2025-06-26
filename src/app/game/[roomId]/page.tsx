@@ -50,6 +50,20 @@ interface Subscription {
   unsubscribe: () => void;
 }
 
+// Safe localStorage functions to prevent SSR errors
+const getLocalStorageItem = (key: string): string | null => {
+  if (typeof window !== 'undefined') {
+    return localStorage.getItem(key);
+  }
+  return null;
+};
+
+const setLocalStorageItem = (key: string, value: string): void => {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(key, value);
+  }
+};
+
 export default function GameRoom() {
   // Router and params
   const router = useRouter();
@@ -57,10 +71,34 @@ export default function GameRoom() {
   const searchParams = useSearchParams();
   const roomId = params?.roomId || '';
   
-  // Player info from URL or localStorage
-  const playerName = searchParams?.get('playerName') || localStorage.getItem('playerName') || '';
-  const isHostParam = searchParams?.get('isHost');
-  const isHost = isHostParam === 'true' || (isHostParam === null && localStorage.getItem('isHost') === 'true');
+  // Player info state
+  const [playerName, setPlayerName] = useState('');
+  const [isHost, setIsHost] = useState(false);
+  
+  // Initialize player info from URL parameters or localStorage
+  useEffect(() => {
+    const nameFromParams = searchParams?.get('playerName');
+    const isHostFromParams = searchParams?.get('isHost');
+    const nameFromStorage = getLocalStorageItem('playerName');
+    const isHostFromStorage = getLocalStorageItem('isHost') === 'true';
+    
+    // Set player name (prioritize URL params over localStorage)
+    const finalPlayerName = nameFromParams || nameFromStorage || '';
+    setPlayerName(finalPlayerName);
+    
+    // Set isHost (prioritize URL params over localStorage)
+    const finalIsHost = isHostFromParams === 'true' || 
+                        (isHostFromParams === null && isHostFromStorage);
+    setIsHost(finalIsHost);
+    
+    // Store values in localStorage
+    if (finalPlayerName) {
+      setLocalStorageItem('playerName', finalPlayerName);
+    }
+    setLocalStorageItem('isHost', finalIsHost ? 'true' : 'false');
+    
+    console.log(`Game room initialized with: roomId=${roomId}, playerName=${finalPlayerName}, isHost=${finalIsHost}`);
+  }, [roomId, searchParams]);
   
   // Game state
   const [loading, setLoading] = useState(true);
@@ -78,12 +116,14 @@ export default function GameRoom() {
   
   // Join the room
   useEffect(() => {
-    const joinRoom = async () => {
-      if (!roomId || !playerName) {
-        router.push('/');
-        return;
+    if (!roomId || !playerName) {
+      if (loading) {
+        setLoading(false); // Don't stay in loading state if we don't have required params
       }
-      
+      return;
+    }
+    
+    const joinRoom = async () => {
       try {
         setLoading(true);
         console.log(`Joining room ${roomId} as ${playerName} (isHost: ${isHost})`);
@@ -122,7 +162,7 @@ export default function GameRoom() {
     };
     
     joinRoom();
-  }, [roomId, playerName, isHost, router]);
+  }, [roomId, playerName, isHost]);
   
   // Subscribe to room events
   useEffect(() => {
@@ -222,6 +262,24 @@ export default function GameRoom() {
   const isPlayerTurn = playerIndex === currentTurn;
   const playerSymbol = playerIndex === 0 ? 'X' : 'O';
   
+  // Missing params state
+  if (!playerName && !loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center p-4 bg-slate-900">
+        <div className="bg-red-900 border border-red-700 text-white px-4 py-3 rounded max-w-md w-full">
+          <h2 className="font-bold mb-2">Missing Information</h2>
+          <p>Player name is required to join a game.</p>
+          <button 
+            onClick={leaveRoom}
+            className="mt-4 bg-red-600 text-white py-2 px-4 rounded hover:bg-red-700"
+          >
+            Return Home
+          </button>
+        </div>
+      </div>
+    );
+  }
+  
   // Loading state
   if (loading) {
     return (
@@ -251,16 +309,6 @@ export default function GameRoom() {
       </div>
     );
   }
-  
-  useEffect(() => {
-    // Store current parameters in localStorage
-    if (playerName) {
-      localStorage.setItem('playerName', playerName);
-    }
-    localStorage.setItem('isHost', isHost ? 'true' : 'false');
-    
-    console.log(`Game room initialized with: roomId=${roomId}, playerName=${playerName}, isHost=${isHost}`);
-  }, [roomId, playerName, isHost]);
   
   return (
     <div className="min-h-screen bg-slate-900 p-4 text-white">
