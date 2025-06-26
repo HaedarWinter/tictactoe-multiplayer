@@ -1,0 +1,162 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --foreground-rgb: 255, 255, 255;
+  --background-start-rgb: 15, 23, 42;
+  --background-end-rgb: 15, 23, 42;
+}
+
+body {
+  color: rgb(var(--foreground-rgb));
+  background: linear-gradient(
+      to bottom,
+      transparent,
+      rgb(var(--background-end-rgb))
+    )
+    rgb(var(--background-start-rgb));
+  min-height: 100vh;
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply px-4 py-2 rounded-md font-medium transition-all duration-200 flex items-center justify-center gap-2;
+  }
+  
+  .btn-primary {
+    @apply bg-primary text-white hover:bg-opacity-90 hover:shadow-glow;
+  }
+  
+  .btn-secondary {
+    @apply bg-secondary text-white hover:bg-opacity-90 hover:shadow-glow-secondary;
+  }
+  
+  .input {
+    @apply px-4 py-2 bg-card border border-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-primary transition-all duration-200;
+  }
+  
+  .chat-input {
+    @apply px-4 py-3 bg-card border border-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-200 w-full;
+  }
+  
+  .card {
+    @apply bg-card p-6 rounded-lg shadow-lg border border-gray-800;
+  }
+}
+
+/* Custom scrollbar */
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(139, 92, 246, 0.5) rgba(30, 41, 59, 0.5);
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: rgba(30, 41, 59, 0.5);
+  border-radius: 3px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background-color: rgba(139, 92, 246, 0.5);
+  border-radius: 3px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(139, 92, 246, 0.8);
+}
+
+/* Animasi konfeti */
+@keyframes confetti {
+  0% {
+    transform: translateY(0) rotate(0);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(100vh) rotate(720deg);
+    opacity: 0;
+  }
+}
+
+.animate-confetti {
+  position: absolute;
+  animation: confetti 5s ease-in-out forwards;
+}
+
+/* Animasi pulsa untuk tombol */
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+.animate-pulse-slow {
+  animation: pulse 2s infinite;
+}
+
+/* Animasi fade in */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.5s ease-out forwards;
+}
+
+/* Animasi untuk papan permainan */
+@keyframes boardAppear {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-board-appear {
+  animation: boardAppear 0.5s ease-out forwards;
+}
+
+/* Animasi untuk highlight */
+@keyframes highlight {
+  0%, 100% {
+    box-shadow: 0 0 0 2px rgba(139, 92, 246, 0);
+  }
+  50% {
+    box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.8);
+  }
+}
+
+.animate-highlight {
+  animation: highlight 1.5s ease-in-out infinite;
+}
+
+/* Glassmorphism effect */
+.glass {
+  background: rgba(30, 41, 59, 0.7);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+} 
