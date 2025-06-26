@@ -12,12 +12,12 @@
   "rewrites": [
     {
       "source": "/socket.io/(.*)",
-      "destination": "/api/socket"
+      "destination": "/api/socketio"
     }
   ],
   "headers": [
     {
-      "source": "/api/socket",
+      "source": "/api/socketio",
       "headers": [
         { "key": "Access-Control-Allow-Credentials", "value": "true" },
         { "key": "Access-Control-Allow-Origin", "value": "*" },

@@ -25,12 +25,12 @@ export const initSocket = async (
     
     // Buat instance socket baru dengan konfigurasi yang sederhana
     socket = io(socketUrl, {
-      path: '/api/socket',
+      path: '/api/socketio',
       reconnectionAttempts: 10,
       reconnectionDelay: 1000,
       timeout: 20000,
-      transports: ['websocket', 'polling'], // Tambahkan transports untuk fallback
-      forceNew: true, // Force new connection
+      transports: ['websocket', 'polling'],
+      forceNew: true,
       query: {
         roomId,
         playerName,
