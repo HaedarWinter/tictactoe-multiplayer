@@ -80,7 +80,8 @@ app.prepare().then(() => {
       methods: ["GET", "POST"],
       allowedHeaders: ["*"],
       credentials: true
-    }
+    },
+    path: '/socket.io'
   });
 
   // Menangani koneksi socket

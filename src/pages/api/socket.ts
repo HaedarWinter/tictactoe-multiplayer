@@ -88,7 +88,7 @@ export default function SocketHandler(req: NextApiRequest, res: NextApiResponseW
 
   // Membuat instance server Socket.io dengan konfigurasi CORS yang lebih sederhana
   io = new Server({
-    path: '/api/socket',
+    path: '/socket.io',
     cors: {
       origin: "*",
       methods: ["GET", "POST"],

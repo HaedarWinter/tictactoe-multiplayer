@@ -107,7 +107,8 @@ export default function SocketHandler(req: NextApiRequest, res: NextApiResponseW
       credentials: true
     },
     transports: ['websocket', 'polling'],
-    allowEIO3: true
+    allowEIO3: true,
+    path: '/socket.io'
   });
 
   // Pasang server Socket.io ke server HTTP Next.js
