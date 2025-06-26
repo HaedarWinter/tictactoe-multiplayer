@@ -95,6 +95,7 @@ export default function SocketHandler(req: NextApiRequest, res: NextApiResponseW
       allowedHeaders: ["*"],
       credentials: true
     },
+    transports: ['websocket', 'polling'],
     addTrailingSlash: false
   });
 

@@ -20,14 +20,17 @@ export const initSocket = async (
 
   try {
     // Tentukan URL socket berdasarkan environment
-    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || '';
+    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || window.location.origin;
+    console.log('Connecting to socket URL:', socketUrl);
     
     // Buat instance socket baru dengan konfigurasi yang sederhana
     socket = io(socketUrl, {
       path: '/api/socket',
-      reconnectionAttempts: 5,
+      reconnectionAttempts: 10,
       reconnectionDelay: 1000,
-      timeout: 10000,
+      timeout: 20000,
+      transports: ['websocket', 'polling'], // Tambahkan transports untuk fallback
+      forceNew: true, // Force new connection
       query: {
         roomId,
         playerName,
@@ -46,15 +49,17 @@ export const initSocket = async (
 
       socket.on('connect_error', (err) => {
         console.error('Socket connection error:', err);
+        console.error('Socket connection error details:', JSON.stringify(err));
         reject(err);
       });
 
       // Timeout jika koneksi terlalu lama
       setTimeout(() => {
         if (socket && !socket.connected) {
+          console.error('Connection timeout after 20 seconds');
           reject(new Error('Connection timeout'));
         }
-      }, 10000);
+      }, 20000);
     });
   } catch (err) {
     console.error('Error initializing socket:', err);
