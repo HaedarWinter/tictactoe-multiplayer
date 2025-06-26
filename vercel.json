@@ -13,5 +13,20 @@
         { "key": "Access-Control-Allow-Headers", "value": "X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version" }
       ]
     }
+  ],
+  "functions": {
+    "api/game/**/*.js": {
+      "memory": 1024,
+      "maxDuration": 10
+    }
+  },
+  "routes": [
+    {
+      "src": "/api/game/(.*)",
+      "headers": {
+        "cache-control": "s-maxage=1, stale-while-revalidate=59"
+      },
+      "continue": true
+    }
   ]
 } 

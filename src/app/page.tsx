@@ -6,19 +6,35 @@ import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 
+// Safe localStorage functions to prevent SSR errors
+const getLocalStorageItem = (key: string): string | null => {
+  if (typeof window !== 'undefined') {
+    return localStorage.getItem(key);
+  }
+  return null;
+};
+
+const setLocalStorageItem = (key: string, value: string): void => {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(key, value);
+  }
+};
+
 export default function Home() {
   const router = useRouter();
   const [roomId, setRoomId] = useState('');
   const [playerName, setPlayerName] = useState('');
   const [joinRoomId, setJoinRoomId] = useState('');
   const [error, setError] = useState('');
+  const [isInitialized, setIsInitialized] = useState(false);
 
   // Load player name from localStorage if available
   useEffect(() => {
-    const savedName = localStorage.getItem('playerName');
+    const savedName = getLocalStorageItem('playerName');
     if (savedName) {
       setPlayerName(savedName);
     }
+    setIsInitialized(true);
   }, []);
 
   // Generate a random room ID
@@ -46,11 +62,16 @@ export default function Home() {
     }
     
     // Save player name for future use
-    localStorage.setItem('playerName', playerName);
-    localStorage.setItem('isHost', 'true');
+    setLocalStorageItem('playerName', playerName);
+    setLocalStorageItem('isHost', 'true');
     
-    // Navigate to the game room
-    router.push(`/game/${roomId}?playerName=${encodeURIComponent(playerName)}&isHost=true`);
+    try {
+      // Navigate to the game room
+      router.push(`/game/${roomId}?playerName=${encodeURIComponent(playerName)}&isHost=true`);
+    } catch (err) {
+      console.error("Navigation error:", err);
+      setError('Error navigating to game room');
+    }
   };
 
   // Join an existing game
@@ -68,12 +89,28 @@ export default function Home() {
     }
     
     // Save player name for future use
-    localStorage.setItem('playerName', playerName);
-    localStorage.setItem('isHost', 'false');
+    setLocalStorageItem('playerName', playerName);
+    setLocalStorageItem('isHost', 'false');
     
-    // Navigate to the game room
-    router.push(`/game/${joinRoomId}?playerName=${encodeURIComponent(playerName)}&isHost=false`);
+    try {
+      // Navigate to the game room
+      router.push(`/game/${joinRoomId}?playerName=${encodeURIComponent(playerName)}&isHost=false`);
+    } catch (err) {
+      console.error("Navigation error:", err);
+      setError('Error navigating to game room');
+    }
   };
+
+  if (!isInitialized) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-900 text-white">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <p>Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-4 bg-slate-900">

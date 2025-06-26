@@ -203,4 +203,83 @@ To fix this issue permanently, you must:
    - Create a new game room and test with two players
    - Check browser console for any remaining errors
 
-If you continue to experience issues, please check your Pusher credentials and ensure they are correctly set in your environment variables. 
+If you continue to experience issues, please check your Pusher credentials and ensure they are correctly set in your environment variables.
+
+## React Error #310 (useEffect Dependencies)
+
+After fixing the Pusher integration, we encountered a React-specific error in the production build:
+
+```
+117-b8cd7cb10f5d17ee.js:1 Error: Minified React error #310; visit https://react.dev/errors/310 for the full message or use the non-minified dev environment for full errors and additional helpful warnings.
+```
+
+### Root Causes:
+
+1. **Server-Side Rendering (SSR) Issues**: 
+   - Using `localStorage` directly in components caused errors during server-side rendering
+   - Missing dependency arrays in useEffect hooks
+   - React state not properly initialized during hydration
+
+2. **Effect Dependencies Problems**:
+   - Missing or incorrect dependencies in useEffect hooks
+   - Stale closures due to improper dependency tracking
+   - Infinite re-rendering loops
+
+3. **Browser API Access During SSR**:
+   - Direct access to browser-only APIs like localStorage on the server
+   - Lack of checks for window/document existence
+
+### Solutions Implemented:
+
+1. **Safe localStorage Access**:
+   - Created wrapper functions to safely access localStorage:
+     ```typescript
+     const getLocalStorageItem = (key: string): string | null => {
+       if (typeof window !== 'undefined') {
+         return localStorage.getItem(key);
+       }
+       return null;
+     };
+     ```
+
+2. **Proper Initialization State**:
+   - Added an initialization flag to prevent rendering before data is loaded:
+     ```typescript
+     const [isInitialized, setIsInitialized] = useState(false);
+     
+     useEffect(() => {
+       // Load data from localStorage
+       setIsInitialized(true);
+     }, []);
+     
+     if (!isInitialized) {
+       return <LoadingSpinner />;
+     }
+     ```
+
+3. **Improved Error Handling**:
+   - Added try/catch blocks around navigation and state updates
+   - Created a custom error boundary and error page
+   - Added global error handling for React errors
+
+4. **Better Vercel Configuration**:
+   - Updated memory and duration limits for serverless functions
+   - Added caching headers for API routes
+   - Improved routing configuration
+
+### Testing the Fixes:
+
+1. **Development Testing**:
+   - Run the application in development mode to check for React warnings
+   - Use React DevTools to inspect component state and effect dependencies
+
+2. **Production Build Testing**:
+   - Create a production build with `npm run build`
+   - Test the application with `npm start`
+   - Verify that no React errors appear in the console
+
+3. **Deployment Testing**:
+   - Deploy to Vercel and test in the production environment
+   - Verify that the application works correctly on different browsers and devices
+
+These improvements have made the application more robust and reliable, especially in the production environment on Vercel. 
