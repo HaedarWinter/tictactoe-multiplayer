@@ -25,7 +25,7 @@ export const initSocket = async (
     
     // Buat instance socket baru dengan konfigurasi yang lebih lengkap
     const socketOptions = {
-      path: '/socket.io',
+      path: '/api/socketio',
       reconnectionAttempts: 10,
       reconnectionDelay: 1000,
       timeout: 20000,

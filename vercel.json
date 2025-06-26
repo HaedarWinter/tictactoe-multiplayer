@@ -9,6 +9,12 @@
   "env": {
     "NEXT_PUBLIC_SOCKET_URL": "https://${VERCEL_URL}"
   },
+  "rewrites": [
+    {
+      "source": "/api/socketio",
+      "destination": "/api/socketio"
+    }
+  ],
   "headers": [
     {
       "source": "/(.*)",
