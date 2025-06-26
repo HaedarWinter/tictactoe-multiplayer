@@ -1,8 +1,13 @@
-import { safeTrigger } from '@/lib/pusher';
+import { safeTrigger, pusherServer } from '@/lib/pusher';
 
 // In-memory storage for rooms (would use a database in production)
 // NOTE: This is not reliable in a serverless environment - each instance gets its own copy
 const rooms = new Map();
+
+// Simple persistence system - store the last 50 room IDs and some basic data
+// This is just a workaround for serverless environment limitations
+const knownRooms = new Map();
+const MAX_KNOWN_ROOMS = 50;
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -32,22 +37,39 @@ export default async function handler(req, res) {
     
     // Create or update the room
     if (!rooms.has(roomId)) {
-      // If room doesn't exist, anyone can create it
-      console.log(`Room ${roomId} not found, creating new room`);
-      
-      // Create new room
-      rooms.set(roomId, {
-        id: roomId,
-        players: [],
-        status: 'waiting',
-        board: Array(9).fill(null),
-        currentTurn: null,
-        winner: null,
-        winningLine: null,
-        chatHistory: []
-      });
-      
-      console.log(`New room created: ${roomId}`);
+      // If room doesn't exist, check if it's in our known rooms list
+      if (knownRooms.has(roomId)) {
+        console.log(`Room ${roomId} found in known rooms cache`);
+        // Use the cached data to reconstruct a basic room
+        const cachedData = knownRooms.get(roomId);
+        rooms.set(roomId, {
+          id: roomId,
+          players: cachedData.players || [],
+          status: cachedData.status || 'waiting',
+          board: Array(9).fill(null),
+          currentTurn: null,
+          winner: null,
+          winningLine: null,
+          chatHistory: cachedData.chatHistory || []
+        });
+      } else {
+        // If room doesn't exist, anyone can create it
+        console.log(`Room ${roomId} not found, creating new room`);
+        
+        // Create new room
+        rooms.set(roomId, {
+          id: roomId,
+          players: [],
+          status: 'waiting',
+          board: Array(9).fill(null),
+          currentTurn: null,
+          winner: null,
+          winningLine: null,
+          chatHistory: []
+        });
+        
+        console.log(`New room created: ${roomId}`);
+      }
     }
     
     const room = rooms.get(roomId);
@@ -91,6 +113,9 @@ export default async function handler(req, res) {
         status: room.status
       });
       
+      // Update the known rooms cache
+      updateKnownRooms(roomId, room);
+      
       return res.status(200).json({
         success: true,
         playerId,
@@ -126,8 +151,20 @@ export default async function handler(req, res) {
       room.chatHistory.push(joinMessage);
     }
     
+    // Update the known rooms cache
+    updateKnownRooms(roomId, room);
+    
     // Send multiple updates to ensure all clients receive them
-    // First broadcast the chat message
+    // First broadcast a direct message to the specific room channel
+    console.log(`Broadcasting direct update to room ${roomId}`);
+    await safeTrigger(`private-room-${roomId}`, 'direct-update', {
+      action: 'player-joined',
+      player: newPlayer,
+      allPlayers: room.players,
+      status: room.status
+    });
+    
+    // Then broadcast the chat message
     console.log(`Broadcasting chat message for room ${roomId}`);
     await safeTrigger(`room-${roomId}`, 'chat-message', joinMessage);
     
@@ -145,6 +182,16 @@ export default async function handler(req, res) {
       totalPlayers: room.players.length
     });
     
+    // Special notification to all channels to try to reach all clients
+    console.log(`Broadcasting global notification for room ${roomId}`);
+    await safeTrigger('global', 'room-notification', {
+      roomId,
+      action: 'player-joined',
+      playerName,
+      playerCount: room.players.length,
+      timestamp: Date.now()
+    });
+    
     // Return success with player data
     console.log(`Sending success response for player ${playerId}`);
     res.status(200).json({
@@ -160,5 +207,31 @@ export default async function handler(req, res) {
   } catch (error) {
     console.error('Error joining room:', error);
     res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
+// Helper function to update the known rooms cache
+function updateKnownRooms(roomId, roomData) {
+  // Store basic room data for recovery in case of instance isolation
+  const basicRoomData = {
+    players: roomData.players.map(p => ({ 
+      id: p.id,
+      name: p.name,
+      isHost: p.isHost,
+      score: p.score
+    })),
+    status: roomData.status,
+    lastUpdated: Date.now(),
+    chatHistory: roomData.chatHistory
+  };
+  
+  knownRooms.set(roomId, basicRoomData);
+  
+  // Prune the cache if it gets too big
+  if (knownRooms.size > MAX_KNOWN_ROOMS) {
+    // Remove the oldest room
+    const oldestRoomId = [...knownRooms.entries()]
+      .sort((a, b) => a[1].lastUpdated - b[1].lastUpdated)[0][0];
+    knownRooms.delete(oldestRoomId);
   }
 } 

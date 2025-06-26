@@ -209,11 +209,22 @@ export const gameClient = {
    * @returns {object} - Subscription channels
    */
   subscribeToRoom(roomId, callbacks = {}) {
-    let channel;
+    let roomChannel;
+    let privateRoomChannel;
+    let globalChannel;
     
     try {
       console.log(`Subscribing to room ${roomId} events`);
-      channel = pusherClient.subscribe(`room-${roomId}`);
+      
+      // Subscribe to the regular room channel
+      roomChannel = pusherClient.subscribe(`room-${roomId}`);
+      
+      // Subscribe to the private room channel
+      // This is for direct messages to this specific room
+      privateRoomChannel = pusherClient.subscribe(`private-room-${roomId}`);
+      
+      // Subscribe to global notifications
+      globalChannel = pusherClient.subscribe('global');
       
       // Connection status events
       if (callbacks.onConnectionStateChange) {
@@ -224,19 +235,19 @@ export const gameClient = {
       }
       
       // Handle subscription errors
-      channel.bind('pusher:subscription_error', (status) => {
+      roomChannel.bind('pusher:subscription_error', (status) => {
         console.error(`Pusher subscription error (${status}) for room ${roomId}`);
         if (callbacks.onError) {
           callbacks.onError(`Failed to subscribe to room events (${status})`);
         }
       });
       
-      channel.bind('pusher:subscription_succeeded', () => {
+      roomChannel.bind('pusher:subscription_succeeded', () => {
         console.log(`Successfully subscribed to room ${roomId}`);
       });
       
       // Room ping for synchronization
-      channel.bind('room-ping', (data) => {
+      roomChannel.bind('room-ping', (data) => {
         console.log(`Room ping received for room ${roomId}:`, data);
         // If we're hosting and someone is trying to join, this helps with serverless instance synchronization
         if (data.action === 'join-attempt') {
@@ -244,9 +255,42 @@ export const gameClient = {
         }
       });
       
+      // Direct update on private channel
+      if (callbacks.onRoomUpdate) {
+        privateRoomChannel.bind('direct-update', (data) => {
+          console.log(`Direct update received for room ${roomId}:`, data);
+          if (data.action === 'player-joined') {
+            console.log(`Direct notification: Player ${data.player.name} joined room ${roomId}`);
+            callbacks.onRoomUpdate({
+              players: data.allPlayers,
+              status: data.status,
+              _directNotification: true
+            });
+          }
+        });
+      }
+      
+      // Global notifications that might be relevant to this room
+      if (callbacks.onRoomUpdate) {
+        globalChannel.bind('room-notification', (data) => {
+          if (data.roomId === roomId) {
+            console.log(`Global notification for room ${roomId}:`, data);
+            if (data.action === 'player-joined') {
+              console.log(`Global notification: Player ${data.playerName} joined room ${roomId}`);
+              
+              // We don't have full player data here, but we can trigger a refresh
+              callbacks.onRoomUpdate({
+                _globalNotification: true,
+                _needsRefresh: true
+              });
+            }
+          }
+        });
+      }
+      
       // Player joined event - more direct than room-update
       if (callbacks.onRoomUpdate) {
-        channel.bind('player-joined', (data) => {
+        roomChannel.bind('player-joined', (data) => {
           console.log(`Player joined event received for room ${roomId}:`, data);
           try {
             // Update the players list using the standard room update callback
@@ -263,7 +307,7 @@ export const gameClient = {
       
       // Room updates (players joining/leaving)
       if (callbacks.onRoomUpdate) {
-        channel.bind('room-update', (data) => {
+        roomChannel.bind('room-update', (data) => {
           console.log(`Room update received for room ${roomId}:`, data);
           try {
             callbacks.onRoomUpdate(data);
@@ -275,7 +319,7 @@ export const gameClient = {
       
       // Game updates (moves, game state changes)
       if (callbacks.onGameUpdate) {
-        channel.bind('game-update', (data) => {
+        roomChannel.bind('game-update', (data) => {
           console.log(`Game update received for room ${roomId}:`, data);
           try {
             callbacks.onGameUpdate(data);
@@ -287,7 +331,7 @@ export const gameClient = {
       
       // Chat messages
       if (callbacks.onChatMessage) {
-        channel.bind('chat-message', (data) => {
+        roomChannel.bind('chat-message', (data) => {
           console.log(`Chat message received for room ${roomId}:`, data);
           try {
             callbacks.onChatMessage(data);
@@ -304,25 +348,38 @@ export const gameClient = {
       
       // Return dummy unsubscribe function to prevent errors
       return {
-        channel: null,
+        channels: [],
         unsubscribe: () => {}
       };
     }
     
     return {
-      channel,
+      channels: [roomChannel, privateRoomChannel, globalChannel].filter(Boolean),
       unsubscribe: () => {
         try {
-          if (channel) {
-            console.log(`Unsubscribing from room ${roomId}`);
-            channel.unbind_all();
+          console.log(`Unsubscribing from room ${roomId}`);
+          
+          if (roomChannel) {
+            roomChannel.unbind_all();
             pusherClient.unsubscribe(`room-${roomId}`);
+          }
+          
+          if (privateRoomChannel) {
+            privateRoomChannel.unbind_all();
+            pusherClient.unsubscribe(`private-room-${roomId}`);
+          }
+          
+          if (globalChannel) {
+            // Only unbind our events, don't unsubscribe from global as other rooms might need it
+            globalChannel.unbind('room-notification');
           }
           
           // Unbind connection state change
           if (callbacks.onConnectionStateChange) {
             pusherClient.connection.unbind('state_change');
           }
+          
+          console.log(`Unsubscribed from room ${roomId}`);
         } catch (error) {
           console.error(`Error unsubscribing from room ${roomId}:`, error);
         }

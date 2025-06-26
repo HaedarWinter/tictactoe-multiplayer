@@ -46,7 +46,7 @@ interface GameResponse {
 }
 
 interface Subscription {
-  channel: any;
+  channels: any[];
   unsubscribe: () => void;
 }
 
@@ -114,16 +114,24 @@ export default function GameRoom() {
   const [chatMessage, setChatMessage] = useState('');
   const [connectionStatus, setConnectionStatus] = useState('connecting');
   const [lastRoomUpdate, setLastRoomUpdate] = useState<number>(0);
+  const [refreshCount, setRefreshCount] = useState<number>(0);
+  const [notificationCount, setNotificationCount] = useState<number>(0);
   
   // Function to refresh the room state - can be called after receiving events
   const refreshRoomState = useCallback(async () => {
-    if (!roomId || !playerId || !playerName) return;
+    if (!roomId || !playerName) return;
     
     try {
       console.log(`Refreshing room state for ${roomId}`);
+      setRefreshCount(prev => prev + 1);
+      
       const response = await gameClient.joinRoom(roomId, playerName, isHost) as RoomResponse;
       
       if (response.success) {
+        if (response.playerId && !playerId) {
+          setPlayerId(response.playerId);
+        }
+        
         setPlayers(response.room.players);
         setGameStatus(response.room.status);
         setChatHistory(response.room.chatHistory || []);
@@ -145,12 +153,15 @@ export default function GameRoom() {
         }
         
         console.log('Successfully refreshed room state:', response);
+        
+        // Update last refresh time
+        setLastRoomUpdate(Date.now());
       }
     } catch (err: any) {
       console.error('Error refreshing room state:', err);
       // Don't set error state here to avoid disrupting the UI
     }
-  }, [roomId, playerId, playerName, isHost]);
+  }, [roomId, playerName, isHost, playerId]);
   
   // Join the room
   useEffect(() => {
@@ -189,6 +200,9 @@ export default function GameRoom() {
             setWinningLine(response.room.winningLine);
           }
           
+          // Update last refresh time
+          setLastRoomUpdate(Date.now());
+          
           console.log('Successfully joined room:', response);
         }
       } catch (err: any) {
@@ -204,7 +218,7 @@ export default function GameRoom() {
   
   // Subscribe to room events
   useEffect(() => {
-    if (!roomId || !playerId) return;
+    if (!roomId) return;
     
     console.log(`Subscribing to room ${roomId} events`);
     const subscription = gameClient.subscribeToRoom(roomId, {
@@ -219,6 +233,29 @@ export default function GameRoom() {
       },
       onRoomUpdate: (data: any) => {
         console.log('Room update received:', data);
+        setNotificationCount(prev => prev + 1);
+        
+        // Set a timestamp so we can track the last update
+        setLastRoomUpdate(Date.now());
+        
+        // Special handling for direct notifications
+        if (data._directNotification) {
+          console.log('Direct notification detected, updating state directly');
+          if (data.players && Array.isArray(data.players)) {
+            setPlayers(data.players);
+          }
+          if (data.status) {
+            setGameStatus(data.status);
+          }
+          return;
+        }
+        
+        // Handle global notifications that need a refresh
+        if (data._globalNotification && data._needsRefresh) {
+          console.log('Global notification detected, refreshing room state');
+          refreshRoomState();
+          return;
+        }
         
         // Special handling for player-joined event
         if (data._playerJoinedEvent) {
@@ -226,9 +263,6 @@ export default function GameRoom() {
           refreshRoomState();
           return;
         }
-        
-        // Set a timestamp so we can track the last update
-        setLastRoomUpdate(Date.now());
         
         // Update players state - but check if the data includes players
         if (data.players && Array.isArray(data.players)) {
@@ -257,7 +291,9 @@ export default function GameRoom() {
         setGameStatus(data.status);
         setWinner(data.winner);
         setWinningLine(data.winningLine);
-        setPlayers(data.players);
+        if (data.players && Array.isArray(data.players)) {
+          setPlayers(data.players);
+        }
       },
       onChatMessage: (message: any) => {
         console.log('Chat message received:', message);
@@ -273,11 +309,11 @@ export default function GameRoom() {
       console.log('Unsubscribing from room events');
       subscription.unsubscribe();
     };
-  }, [roomId, playerId, players.length, isHost, refreshRoomState]);
+  }, [roomId, refreshRoomState]);
   
   // Refresh room state periodically if host with no second player
   useEffect(() => {
-    if (!isHost || !roomId || !playerId || players.length >= 2 || gameStatus !== 'waiting') {
+    if (!isHost || !roomId || !playerName || players.length >= 2 || gameStatus !== 'waiting') {
       return;
     }
     
@@ -291,7 +327,27 @@ export default function GameRoom() {
     }, 5000);
     
     return () => clearInterval(interval);
-  }, [isHost, roomId, playerId, players.length, gameStatus, lastRoomUpdate, refreshRoomState]);
+  }, [isHost, roomId, playerName, players.length, gameStatus, lastRoomUpdate, refreshRoomState]);
+  
+  // Force refresh on notification count change - ensures we get updates even if events were missed
+  useEffect(() => {
+    if (notificationCount > 0 && isHost && players.length < 2 && gameStatus === 'waiting') {
+      // Add a small delay to avoid immediate refresh
+      const timer = setTimeout(() => {
+        console.log('Notification triggered refresh');
+        refreshRoomState();
+      }, 1000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [notificationCount, isHost, players.length, gameStatus, refreshRoomState]);
+  
+  // Debug refreshes
+  useEffect(() => {
+    if (refreshCount > 0) {
+      console.log(`Room state refreshed ${refreshCount} times`);
+    }
+  }, [refreshCount]);
   
   // Start the game (host only)
   const startGame = async () => {
@@ -351,6 +407,18 @@ export default function GameRoom() {
   const isPlayerTurn = playerIndex === currentTurn;
   const playerSymbol = playerIndex === 0 ? 'X' : 'O';
   
+  // Debug info
+  const debugInfo = {
+    room: roomId,
+    player: playerName,
+    isHost,
+    playerId: playerId?.substring(0, 8) || 'none',
+    players: players.length,
+    notifications: notificationCount,
+    refreshes: refreshCount,
+    lastUpdate: lastRoomUpdate ? new Date(lastRoomUpdate).toLocaleTimeString() : 'never'
+  };
+  
   // Missing params state
   if (!playerName && !loading) {
     return (
@@ -408,13 +476,29 @@ export default function GameRoom() {
       )}
       
       {gameStatus === 'waiting' ? (
-        <WaitingRoom 
-          roomId={roomId}
-          players={players}
-          isHost={isHost}
-          onStartGame={startGame}
-          onLeaveRoom={leaveRoom}
-        />
+        <>
+          <WaitingRoom 
+            roomId={roomId}
+            players={players}
+            isHost={isHost}
+            onStartGame={startGame}
+            onLeaveRoom={leaveRoom}
+          />
+          
+          {/* Debug info - only visible during waiting state */}
+          <div className="mt-4 p-2 bg-slate-800 rounded text-xs text-gray-400 max-w-md mx-auto">
+            <div className="font-bold mb-1">Debug Info:</div>
+            <pre className="overflow-x-auto whitespace-pre-wrap">
+              {JSON.stringify(debugInfo, null, 2)}
+            </pre>
+            <button 
+              onClick={() => refreshRoomState()}
+              className="mt-2 w-full bg-slate-700 text-xs py-1 rounded hover:bg-slate-600"
+            >
+              Force Refresh Room
+            </button>
+          </div>
+        </>
       ) : (
         <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8">
           <div className="md:col-span-2">
