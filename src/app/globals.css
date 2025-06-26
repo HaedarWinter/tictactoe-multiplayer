@@ -39,15 +39,15 @@ body {
   }
   
   .input {
-    @apply px-4 py-2 bg-card border border-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-primary transition-all duration-200;
+    @apply px-4 py-2 bg-slate-800 border border-slate-700 rounded-md focus:outline-none focus:ring-2 focus:ring-primary transition-all duration-200 text-white;
   }
   
   .chat-input {
-    @apply px-4 py-3 bg-card border border-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-200 w-full;
+    @apply px-4 py-3 bg-slate-800 border border-slate-700 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-200 w-full text-white;
   }
   
   .card {
-    @apply bg-card p-6 rounded-lg shadow-lg border border-gray-800;
+    @apply bg-slate-800 p-6 rounded-lg shadow-lg border border-slate-700 text-white;
   }
 }
 

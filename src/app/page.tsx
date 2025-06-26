@@ -76,47 +76,47 @@ export default function Home() {
   };
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-4 bg-gray-100">
-      <div className="max-w-md w-full bg-white rounded-lg shadow-md p-6">
+    <main className="flex min-h-screen flex-col items-center justify-center p-4 bg-slate-900">
+      <div className="max-w-md w-full bg-slate-800 rounded-lg shadow-lg p-6 border border-slate-700 text-white">
         <h1 className="text-3xl font-bold text-center mb-6">Tic Tac Toe Multiplayer</h1>
         
         {error && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+          <div className="bg-red-900 border border-red-700 text-red-100 px-4 py-3 rounded mb-4">
             {error}
           </div>
         )}
         
         <div className="mb-6">
-          <label htmlFor="playerName" className="block text-gray-700 mb-2">Your Name</label>
+          <label htmlFor="playerName" className="block text-gray-300 mb-2">Your Name</label>
           <input
             type="text"
             id="playerName"
             value={playerName}
             onChange={(e) => setPlayerName(e.target.value)}
-            className="w-full p-2 border rounded"
+            className="w-full p-2 border rounded bg-slate-700 border-slate-600 text-white"
             placeholder="Enter your name"
           />
         </div>
         
         <div className="space-y-6">
-          <div className="border-t pt-4">
+          <div className="border-t border-slate-700 pt-4">
             <h2 className="text-xl font-semibold mb-4">Create a New Game</h2>
             <form onSubmit={createGame}>
               <div className="mb-4">
-                <label htmlFor="roomId" className="block text-gray-700 mb-2">Room ID (optional)</label>
+                <label htmlFor="roomId" className="block text-gray-300 mb-2">Room ID (optional)</label>
                 <div className="flex space-x-2">
                   <input
                     type="text"
                     id="roomId"
                     value={roomId}
                     onChange={(e) => setRoomId(e.target.value)}
-                    className="w-full p-2 border rounded"
+                    className="w-full p-2 border rounded bg-slate-700 border-slate-600 text-white"
                     placeholder="Random ID will be generated"
                   />
                   <button
                     type="button"
                     onClick={generateRoomId}
-                    className="bg-gray-200 px-4 py-2 rounded"
+                    className="bg-slate-700 px-4 py-2 rounded hover:bg-slate-600 transition-colors"
                   >
                     Generate
                   </button>
@@ -124,30 +124,30 @@ export default function Home() {
               </div>
               <button
                 type="submit"
-                className="w-full bg-blue-500 text-white py-2 rounded hover:bg-blue-600"
+                className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-500 transition-colors"
               >
                 Create Game
               </button>
             </form>
           </div>
           
-          <div className="border-t pt-4">
+          <div className="border-t border-slate-700 pt-4">
             <h2 className="text-xl font-semibold mb-4">Join a Game</h2>
             <form onSubmit={joinGame}>
               <div className="mb-4">
-                <label htmlFor="joinRoomId" className="block text-gray-700 mb-2">Room ID</label>
+                <label htmlFor="joinRoomId" className="block text-gray-300 mb-2">Room ID</label>
                 <input
                   type="text"
                   id="joinRoomId"
                   value={joinRoomId}
                   onChange={(e) => setJoinRoomId(e.target.value)}
-                  className="w-full p-2 border rounded"
+                  className="w-full p-2 border rounded bg-slate-700 border-slate-600 text-white"
                   placeholder="Enter room ID"
                 />
               </div>
               <button
                 type="submit"
-                className="w-full bg-green-500 text-white py-2 rounded hover:bg-green-600"
+                className="w-full bg-green-600 text-white py-2 rounded hover:bg-green-500 transition-colors"
               >
                 Join Game
               </button>

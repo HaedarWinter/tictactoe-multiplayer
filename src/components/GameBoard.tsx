@@ -30,7 +30,7 @@ const GameBoard: React.FC<GameBoardProps> = ({
   };
   
   return (
-    <div className="bg-white rounded-lg shadow-md p-6">
+    <div className="bg-slate-800 rounded-lg shadow-lg p-6 border border-slate-700">
       <h2 className="text-2xl font-bold text-center mb-6">Tic-Tac-Toe</h2>
       
       <div className="grid grid-cols-3 gap-2 mb-4 max-w-md mx-auto">
@@ -40,8 +40,8 @@ const GameBoard: React.FC<GameBoardProps> = ({
             className={`
               aspect-square flex items-center justify-center
               text-4xl font-bold rounded 
-              ${isWinningSquare(index) ? 'bg-green-100 border-green-500' : 'bg-gray-100'}
-              ${canMakeMove(index) ? 'cursor-pointer hover:bg-gray-200' : 'cursor-default'}
+              ${isWinningSquare(index) ? 'bg-green-800 border-green-600' : 'bg-slate-700'}
+              ${canMakeMove(index) ? 'cursor-pointer hover:bg-slate-600' : 'cursor-default'}
               border-2 transition-all duration-200
             `}
             onClick={() => canMakeMove(index) && onSquareClick(index)}
@@ -53,7 +53,7 @@ const GameBoard: React.FC<GameBoardProps> = ({
       </div>
       
       {gameStatus === 'playing' && (
-        <div className="text-center py-2 bg-blue-100 rounded">
+        <div className="text-center py-2 bg-blue-900 rounded">
           {isPlayerTurn ? (
             <p className="font-semibold">Your turn</p>
           ) : (

@@ -73,6 +73,7 @@ export default function GameRoom() {
   const [winningLine, setWinningLine] = useState<number[] | null>(null);
   const [chatHistory, setChatHistory] = useState<any[]>([]);
   const [chatMessage, setChatMessage] = useState('');
+  const [connectionStatus, setConnectionStatus] = useState('connecting');
   
   // Join the room
   useEffect(() => {
@@ -84,6 +85,7 @@ export default function GameRoom() {
       
       try {
         setLoading(true);
+        console.log(`Joining room ${roomId} as ${playerName} (isHost: ${isHost})`);
         const response = await gameClient.joinRoom(roomId, playerName, isHost) as RoomResponse;
         
         if (response.success) {
@@ -107,10 +109,12 @@ export default function GameRoom() {
           if (response.room.winningLine) {
             setWinningLine(response.room.winningLine);
           }
+          
+          console.log('Successfully joined room:', response);
         }
       } catch (err: any) {
-        setError(err.message || 'Failed to join room');
         console.error('Error joining room:', err);
+        setError(err.message || 'Failed to join room');
       } finally {
         setLoading(false);
       }
@@ -123,12 +127,19 @@ export default function GameRoom() {
   useEffect(() => {
     if (!roomId || !playerId) return;
     
+    console.log(`Subscribing to room ${roomId} events`);
     const subscription = gameClient.subscribeToRoom(roomId, {
+      onConnectionStateChange: (state: string) => {
+        console.log(`Connection state changed to: ${state}`);
+        setConnectionStatus(state);
+      },
       onRoomUpdate: (data: any) => {
+        console.log('Room update received:', data);
         setPlayers(data.players);
         setGameStatus(data.status);
       },
       onGameUpdate: (data: any) => {
+        console.log('Game update received:', data);
         setBoard(data.board);
         setCurrentTurn(data.currentTurn);
         setGameStatus(data.status);
@@ -137,11 +148,17 @@ export default function GameRoom() {
         setPlayers(data.players);
       },
       onChatMessage: (message: any) => {
+        console.log('Chat message received:', message);
         setChatHistory(prev => [...prev, message]);
+      },
+      onError: (errorMsg: string) => {
+        console.error('Subscription error:', errorMsg);
+        setError(`Connection error: ${errorMsg}`);
       }
     }) as Subscription;
     
     return () => {
+      console.log('Unsubscribing from room events');
       subscription.unsubscribe();
     };
   }, [roomId, playerId]);
@@ -151,14 +168,15 @@ export default function GameRoom() {
     if (!roomId || !playerId || !isHost) return;
     
     try {
+      console.log('Starting game...');
       const response = await gameClient.startGame(roomId, playerId) as GameResponse;
       
       if (!response.success) {
         setError(response.message || 'Failed to start game');
       }
     } catch (err: any) {
-      setError(err.message || 'Failed to start game');
       console.error('Error starting game:', err);
+      setError(err.message || 'Failed to start game');
     }
   };
   
@@ -170,10 +188,11 @@ export default function GameRoom() {
     if (playerIndex === -1 || currentTurn !== playerIndex) return;
     
     try {
+      console.log(`Making move at position ${position}`);
       await gameClient.makeMove(roomId, playerId, position);
     } catch (err: any) {
-      setError(err.message || 'Failed to make move');
       console.error('Error making move:', err);
+      setError(err.message || 'Failed to make move');
     }
   };
   
@@ -184,6 +203,7 @@ export default function GameRoom() {
     if (!roomId || !playerId || !chatMessage.trim()) return;
     
     try {
+      console.log(`Sending message: ${chatMessage}`);
       await gameClient.sendMessage(roomId, playerId, chatMessage);
       setChatMessage('');
     } catch (err: any) {
@@ -204,7 +224,7 @@ export default function GameRoom() {
   // Loading state
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center bg-slate-900 text-white">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mx-auto mb-4"></div>
           <p>Loading game...</p>
@@ -216,13 +236,13 @@ export default function GameRoom() {
   // Error state
   if (error) {
     return (
-      <div className="flex min-h-screen items-center justify-center p-4">
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded max-w-md w-full">
+      <div className="flex min-h-screen items-center justify-center p-4 bg-slate-900">
+        <div className="bg-red-900 border border-red-700 text-white px-4 py-3 rounded max-w-md w-full">
           <h2 className="font-bold mb-2">Error</h2>
           <p>{error}</p>
           <button 
             onClick={leaveRoom}
-            className="mt-4 bg-red-500 text-white py-2 px-4 rounded hover:bg-red-600"
+            className="mt-4 bg-red-600 text-white py-2 px-4 rounded hover:bg-red-700"
           >
             Return Home
           </button>
@@ -232,7 +252,13 @@ export default function GameRoom() {
   }
   
   return (
-    <div className="min-h-screen bg-gray-100 p-4">
+    <div className="min-h-screen bg-slate-900 p-4 text-white">
+      {connectionStatus !== 'connected' && (
+        <div className="fixed top-0 left-0 right-0 bg-yellow-600 text-white text-center py-1 px-2 z-50">
+          {connectionStatus === 'connecting' ? 'Connecting...' : `Connection status: ${connectionStatus}`}
+        </div>
+      )}
+      
       {gameStatus === 'waiting' ? (
         <WaitingRoom 
           roomId={roomId}
@@ -252,7 +278,7 @@ export default function GameRoom() {
               gameStatus={gameStatus}
             />
             
-            <div className="mt-6 bg-white rounded-lg shadow-md p-4">
+            <div className="mt-6 bg-slate-800 rounded-lg shadow-md p-4 border border-slate-700">
               <h2 className="text-xl font-semibold mb-2">Game Status</h2>
               
               <div className="flex justify-between mb-4">
@@ -267,7 +293,7 @@ export default function GameRoom() {
                 </div>
               </div>
               
-              <div className="text-center py-2 rounded bg-gray-100">
+              <div className="text-center py-2 rounded bg-slate-700">
                 {gameStatus === 'playing' && (
                   <p>
                     {currentTurn !== null && players[currentTurn] 
@@ -286,7 +312,7 @@ export default function GameRoom() {
               {gameStatus === 'completed' && isHost && (
                 <button
                   onClick={startGame}
-                  className="mt-4 w-full bg-blue-500 text-white py-2 rounded hover:bg-blue-600"
+                  className="mt-4 w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-500"
                 >
                   Play Again
                 </button>
@@ -294,20 +320,20 @@ export default function GameRoom() {
               
               <button
                 onClick={leaveRoom}
-                className="mt-2 w-full bg-gray-500 text-white py-2 rounded hover:bg-gray-600"
+                className="mt-2 w-full bg-slate-700 text-white py-2 rounded hover:bg-slate-600"
               >
                 Leave Room
               </button>
             </div>
           </div>
           
-          <div className="bg-white rounded-lg shadow-md p-4 h-[70vh] flex flex-col">
+          <div className="bg-slate-800 rounded-lg shadow-md p-4 h-[70vh] flex flex-col border border-slate-700">
             <h2 className="text-xl font-semibold mb-2">Chat</h2>
             
-            <div className="flex-1 overflow-y-auto mb-4 border rounded p-2">
+            <div className="flex-1 overflow-y-auto mb-4 border border-slate-700 rounded p-2 scrollbar-thin">
               {chatHistory.map((msg, i) => (
                 <div key={i} className="mb-2">
-                  <span className={`font-bold ${msg.sender === 'System' ? 'text-gray-500' : ''}`}>
+                  <span className={`font-bold ${msg.sender === 'System' ? 'text-gray-400' : ''}`}>
                     {msg.sender}:
                   </span> {msg.message}
                 </div>
@@ -319,12 +345,12 @@ export default function GameRoom() {
                 type="text"
                 value={chatMessage}
                 onChange={(e) => setChatMessage(e.target.value)}
-                className="flex-1 p-2 border rounded-l"
+                className="flex-1 p-2 border rounded-l bg-slate-700 border-slate-600 text-white"
                 placeholder="Type a message..."
               />
               <button
                 type="submit"
-                className="bg-blue-500 text-white px-4 py-2 rounded-r"
+                className="bg-blue-600 text-white px-4 py-2 rounded-r hover:bg-blue-500"
               >
                 Send
               </button>
