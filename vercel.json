@@ -2,6 +2,10 @@
   "version": 2,
   "builds": [
     {
+      "src": "server.js",
+      "use": "@vercel/node"
+    },
+    {
       "src": "package.json",
       "use": "@vercel/next"
     }
@@ -9,14 +13,14 @@
   "env": {
     "NEXT_PUBLIC_SOCKET_URL": "https://${VERCEL_URL}"
   },
-  "rewrites": [
+  "routes": [
     {
-      "source": "/socket.io/(.*)",
-      "destination": "/api/socketio"
+      "src": "/socket.io/(.*)",
+      "dest": "/api/socketio"
     },
     {
-      "source": "/api/socketio",
-      "destination": "/api/socketio"
+      "src": "/(.*)",
+      "dest": "/$1"
     }
   ],
   "headers": [

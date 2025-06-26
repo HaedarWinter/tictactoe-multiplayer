@@ -4,7 +4,9 @@ const next = require('next');
 const { Server } = require('socket.io');
 
 const dev = process.env.NODE_ENV !== 'production';
-const app = next({ dev });
+const hostname = 'localhost';
+const port = process.env.PORT || 3000;
+const app = next({ dev, hostname, port });
 const handle = app.getRequestHandler();
 
 // Tipe untuk data pemain
@@ -42,36 +44,43 @@ const checkWinner = (board) => {
   return { winner: null, line: null };
 };
 
-// Fungsi untuk mencari port yang tersedia
-const findAvailablePort = (startPort) => {
-  return new Promise((resolve, reject) => {
-    const net = require('net');
-    const server = net.createServer();
-    
-    server.once('error', (err) => {
-      if (err.code === 'EADDRINUSE') {
-        // Port sudah digunakan, coba port berikutnya
-        resolve(findAvailablePort(startPort + 1));
-      } else {
-        reject(err);
-      }
-    });
-    
-    server.once('listening', () => {
-      // Port tersedia, tutup server dan kembalikan port
-      server.close(() => {
-        resolve(startPort);
-      });
-    });
-    
-    server.listen(startPort);
-  });
-};
-
 app.prepare().then(() => {
-  const server = createServer((req, res) => {
-    const parsedUrl = parse(req.url, true);
-    handle(req, res, parsedUrl);
+  console.log('Next.js app is prepared');
+  
+  const server = createServer(async (req, res) => {
+    try {
+      // Menangani CORS untuk preflight request
+      if (req.method === 'OPTIONS') {
+        res.writeHead(200, {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+          'Access-Control-Allow-Headers': 'Origin, X-Requested-With, Content-Type, Accept, X-CSRF-Token, X-Api-Version',
+          'Access-Control-Allow-Credentials': 'true'
+        });
+        res.end();
+        return;
+      }
+
+      // Tambahkan CORS headers ke semua response
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, X-CSRF-Token, X-Api-Version');
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+
+      // Khusus untuk path Socket.io
+      const parsedUrl = parse(req.url, true);
+      if (parsedUrl.pathname && parsedUrl.pathname.startsWith('/socket.io')) {
+        console.log('Socket.io request handled by server.js');
+        return;
+      }
+
+      // Untuk semua request lainnya, gunakan Next.js handler
+      await handle(req, res, parsedUrl);
+    } catch (err) {
+      console.error('Error occurred handling request:', err);
+      res.statusCode = 500;
+      res.end('Internal Server Error');
+    }
   });
 
   const io = new Server(server, {
@@ -249,61 +258,63 @@ app.prepare().then(() => {
       io.to(roomId).emit('turn-update', room.currentTurn);
       
       // Tambahkan pesan sistem bahwa game dimulai
-      const gameStartMessage = {
+      const startMessage = {
         sender: 'Sistem',
-        message: 'Permainan dimulai!'
+        message: 'Game dimulai! ' + hostPlayer?.name + ' (X) giliran pertama.'
       };
       
       if (chatHistory.has(roomId)) {
-        chatHistory.get(roomId).push(gameStartMessage);
+        chatHistory.get(roomId).push(startMessage);
       }
       
-      io.to(roomId).emit('chat-message', gameStartMessage);
+      io.to(roomId).emit('chat-message', startMessage);
     });
     
-    // Event untuk membuat gerakan
-    socket.on('make-move', ({ roomId, index, symbol }) => {
+    // Event untuk gerakan pemain
+    socket.on('make-move', ({ roomId, index }) => {
       const room = rooms.get(roomId);
       if (!room) return;
       
-      console.log(`Player ${socket.id} making move at index ${index} with symbol ${symbol}`);
+      // Validasi: game harus dalam status playing
+      if (room.status !== 'playing') {
+        socket.emit('error-message', 'Game belum dimulai');
+        return;
+      }
       
-      // Periksa apakah giliran pemain ini
+      // Validasi: harus giliran pemain ini
       if (room.currentTurn !== socket.id) {
         socket.emit('error-message', 'Bukan giliran Anda');
         return;
       }
       
-      // Periksa apakah kotak sudah terisi
+      // Validasi: kotak harus kosong
       if (room.board[index] !== null) {
         socket.emit('error-message', 'Kotak sudah terisi');
         return;
       }
       
-      // Buat gerakan
-      room.board[index] = symbol;
+      // Dapatkan simbol pemain
+      const playerSymbol = player.isHost ? 'X' : 'O';
       
-      // Kirim update papan ke semua pemain
-      io.to(roomId).emit('board-update', room.board);
+      // Update papan
+      room.board[index] = playerSymbol;
       
-      // Periksa pemenang
+      // Cek pemenang
       const { winner, line } = checkWinner(room.board);
       
       if (winner || line) {
         // Ada pemenang atau seri
         room.status = 'finished';
         
-        // Jika ada pemenang, tambahkan skor
         if (winner) {
-          const winnerPlayer = room.players.find(p => 
-            (p.isHost && winner === 'X') || (!p.isHost && winner === 'O')
-          );
-          
+          // Update pemenang
+          const winnerPlayer = room.players.find(p => (p.isHost && winner === 'X') || (!p.isHost && winner === 'O'));
           if (winnerPlayer) {
             winnerPlayer.score += 1;
             room.winner = winnerPlayer;
+            room.winningLine = line;
             
-            // Tambahkan pesan sistem tentang pemenang
+            // Kirim pesan kemenangan
             const winMessage = {
               sender: 'Sistem',
               message: `${winnerPlayer.name} memenangkan permainan!`
@@ -316,7 +327,7 @@ app.prepare().then(() => {
             io.to(roomId).emit('chat-message', winMessage);
           }
         } else {
-          // Permainan seri
+          // Seri
           const drawMessage = {
             sender: 'Sistem',
             message: 'Permainan berakhir seri!'
@@ -329,37 +340,52 @@ app.prepare().then(() => {
           io.to(roomId).emit('chat-message', drawMessage);
         }
         
-        room.winningLine = line;
-        
-        console.log(`Game in room ${roomId} ended with winner: ${room.winner?.name || 'Seri'}`);
-        
-        // Kirim hasil game
-        io.to(roomId).emit('game-end', {
-          winner: room.winner,
-          winningLine: room.winningLine,
-        });
-        
-        // Update room
+        // Kirim update status ke pemain
         io.to(roomId).emit('room-update', {
           players: room.players,
           status: room.status,
         });
-      } else {
-        // Ganti giliran
-        const nextPlayer = room.players.find(p => p.id !== socket.id);
-        room.currentTurn = nextPlayer?.id || null;
         
-        // Kirim update giliran
+        // Kirim update papan
+        io.to(roomId).emit('board-update', room.board);
+        
+        // Jika ada pemenang, kirim info garis kemenangan
+        if (winner) {
+          io.to(roomId).emit('game-win', {
+            winner: room.winner,
+            line: room.winningLine
+          });
+        } else {
+          io.to(roomId).emit('game-draw');
+        }
+      } else {
+        // Belum ada pemenang, lanjutkan game
+        // Ganti giliran
+        const otherPlayer = room.players.find(p => p.id !== socket.id);
+        room.currentTurn = otherPlayer?.id || null;
+        
+        // Kirim update papan
+        io.to(roomId).emit('board-update', room.board);
         io.to(roomId).emit('turn-update', room.currentTurn);
       }
     });
     
-    // Event untuk main lagi
-    socket.on('play-again', () => {
+    // Event untuk restart game
+    socket.on('restart-game', () => {
       const room = rooms.get(roomId);
       if (!room) return;
       
-      console.log(`Starting new game in room ${roomId}`);
+      // Validasi: hanya host yang bisa restart
+      if (!player.isHost) {
+        socket.emit('error-message', 'Hanya host yang bisa memulai ulang game');
+        return;
+      }
+      
+      // Validasi: game harus selesai
+      if (room.status !== 'finished') {
+        socket.emit('error-message', 'Game belum selesai');
+        return;
+      }
       
       // Reset game
       room.status = 'playing';
@@ -377,104 +403,97 @@ app.prepare().then(() => {
         status: room.status,
       });
       
+      io.to(roomId).emit('game-start');
       io.to(roomId).emit('board-update', room.board);
       io.to(roomId).emit('turn-update', room.currentTurn);
       
-      // Tambahkan pesan sistem bahwa permainan baru dimulai
-      const newGameMessage = {
+      // Tambahkan pesan sistem bahwa game dimulai ulang
+      const restartMessage = {
         sender: 'Sistem',
-        message: 'Permainan baru dimulai!'
+        message: 'Game dimulai ulang! ' + hostPlayer?.name + ' (X) giliran pertama.'
       };
       
       if (chatHistory.has(roomId)) {
-        chatHistory.get(roomId).push(newGameMessage);
+        chatHistory.get(roomId).push(restartMessage);
       }
       
-      io.to(roomId).emit('chat-message', newGameMessage);
+      io.to(roomId).emit('chat-message', restartMessage);
     });
     
-    // Event saat pemain disconnect
+    // Event ketika pemain terputus
     socket.on('disconnect', () => {
       console.log('User disconnected:', socket.id);
       
+      // Jika tidak di room, tidak perlu melakukan apa-apa
+      if (!rooms.has(roomId)) return;
+      
       const room = rooms.get(roomId);
-      if (!room) return;
       
       // Hapus pemain dari room
-      const disconnectedPlayer = room.players.find(p => p.id === socket.id);
       room.players = room.players.filter(p => p.id !== socket.id);
-      
-      console.log(`Player ${socket.id} removed from room ${roomId}, ${room.players.length} players remaining`);
-      
-      // Tambahkan pesan sistem bahwa pemain keluar
-      if (disconnectedPlayer) {
-        const leaveMessage = {
-          sender: 'Sistem',
-          message: `${disconnectedPlayer.name} telah meninggalkan game`
-        };
-        
-        if (chatHistory.has(roomId)) {
-          chatHistory.get(roomId).push(leaveMessage);
-        }
-        
-        io.to(roomId).emit('chat-message', leaveMessage);
-      }
       
       // Jika room kosong, hapus room
       if (room.players.length === 0) {
+        console.log(`Room ${roomId} is empty, deleting`);
         rooms.delete(roomId);
         chatHistory.delete(roomId);
-        console.log(`Room ${roomId} deleted`);
         return;
       }
       
-      // Jika game sedang berlangsung, akhiri game
+      // Kirim pesan bahwa pemain keluar
+      const leaveMessage = {
+        sender: 'Sistem',
+        message: `${player.name} telah keluar dari game`
+      };
+      
+      if (chatHistory.has(roomId)) {
+        chatHistory.get(roomId).push(leaveMessage);
+      }
+      
+      io.to(roomId).emit('chat-message', leaveMessage);
+      
+      // Jika game sedang berlangsung, akhiri
       if (room.status === 'playing') {
         room.status = 'waiting';
         
-        // Jika ada pemain yang tersisa, jadikan host
-        if (room.players.length > 0 && !room.players.some(p => p.isHost)) {
-          room.players[0].isHost = true;
-          console.log(`Player ${room.players[0].id} promoted to host in room ${roomId}`);
-          
-          const promotedMessage = {
-            sender: 'Sistem',
-            message: `${room.players[0].name} sekarang menjadi host`
-          };
-          
-          if (chatHistory.has(roomId)) {
-            chatHistory.get(roomId).push(promotedMessage);
-          }
-          
-          io.to(roomId).emit('chat-message', promotedMessage);
-        }
+        // Reset board
+        room.board = Array(9).fill(null);
+        room.currentTurn = null;
+        room.winner = null;
+        room.winningLine = null;
         
         // Kirim update ke pemain yang tersisa
-        io.to(roomId).emit('error-message', 'Lawan meninggalkan permainan');
+        io.to(roomId).emit('room-update', {
+          players: room.players,
+          status: room.status,
+        });
+        
+        io.to(roomId).emit('player-left');
+        
+        const endMessage = {
+          sender: 'Sistem',
+          message: 'Game berakhir karena pemain keluar'
+        };
+        
+        if (chatHistory.has(roomId)) {
+          chatHistory.get(roomId).push(endMessage);
+        }
+        
+        io.to(roomId).emit('chat-message', endMessage);
+      } else {
+        // Jika game belum dimulai, update status saja
+        io.to(roomId).emit('room-update', {
+          players: room.players,
+          status: room.status,
+        });
       }
-      
-      // Kirim update room
-      io.to(roomId).emit('room-update', {
-        players: room.players,
-        status: room.status,
-      });
-      
-      // Hapus pemain dari daftar
-      players.delete(socket.id);
     });
   });
 
-  // Cari port yang tersedia dimulai dari 3000
-  findAvailablePort(3000)
-    .then(port => {
-      server.listen(port, (err) => {
-        if (err) throw err;
-        console.log(`> Server berjalan di http://localhost:${port}`);
-        console.log('> Buka browser dan akses URL di atas untuk bermain');
-      });
-    })
-    .catch(err => {
-      console.error('Gagal mencari port yang tersedia:', err);
-      process.exit(1);
-    });
+  server.listen(port, () => {
+    console.log(`> Ready on http://${hostname}:${port}`);
+  });
+}).catch((ex) => {
+  console.error(ex.stack);
+  process.exit(1);
 }); 
