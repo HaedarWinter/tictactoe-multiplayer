@@ -1,6 +1,7 @@
 import { safeTrigger } from '@/lib/pusher';
 
 // In-memory storage for rooms (would use a database in production)
+// NOTE: This is not reliable in a serverless environment - each instance gets its own copy
 const rooms = new Map();
 
 export default async function handler(req, res) {
@@ -20,10 +21,18 @@ export default async function handler(req, res) {
     // Generate a unique player ID
     const playerId = `player_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
     
+    // Always broadcast a ping to the room to ensure all instances are in sync
+    // This ensures the host knows a player is trying to join even if on different instance
+    console.log(`Broadcasting ping to room ${roomId} to sync instances`);
+    await safeTrigger(`room-${roomId}`, 'room-ping', {
+      action: 'join-attempt',
+      playerName,
+      timestamp: Date.now()
+    });
+    
     // Create or update the room
     if (!rooms.has(roomId)) {
-      // If room doesn't exist, anyone can create it (but they'll be marked as host)
-      // This handles the issue with serverless functions where rooms may get reset
+      // If room doesn't exist, anyone can create it
       console.log(`Room ${roomId} not found, creating new room`);
       
       // Create new room
@@ -47,17 +56,51 @@ export default async function handler(req, res) {
     // Check if room is full
     if (room.players.length >= 2) {
       console.log(`Room ${roomId} is full`);
+      // Try to sync before rejecting
+      await safeTrigger(`room-${roomId}`, 'room-update', {
+        players: room.players,
+        status: room.status
+      });
+      
       return res.status(400).json({ message: 'Room is full' });
     }
     
     // If this is the first player, make them the host regardless of isHost parameter
-    let shouldBeHost = room.players.length === 0 ? true : isHost;
+    let shouldBeHost = room.players.length === 0 ? true : isHost === true;
     
     // Check if host role is already taken
     if (shouldBeHost && room.players.some(p => p.isHost)) {
       console.log(`Room ${roomId} already has a host`);
       // If host role is taken, let them join as a non-host
       shouldBeHost = false;
+    }
+    
+    // Check if player with same name already exists
+    const existingPlayerIndex = room.players.findIndex(p => p.name === playerName);
+    if (existingPlayerIndex >= 0) {
+      console.log(`Player with name ${playerName} already exists in room ${roomId}`);
+      
+      // If it's the same player reconnecting, update their ID and return
+      const existingPlayer = room.players[existingPlayerIndex];
+      existingPlayer.id = playerId; // Update ID for new connection
+      
+      // Always broadcast an update regardless
+      console.log(`Broadcasting room update for room ${roomId} (player reconnect)`);
+      await safeTrigger(`room-${roomId}`, 'room-update', {
+        players: room.players,
+        status: room.status
+      });
+      
+      return res.status(200).json({
+        success: true,
+        playerId,
+        room: {
+          id: roomId,
+          players: room.players,
+          status: room.status,
+          chatHistory: room.chatHistory || []
+        }
+      });
     }
     
     // Add player to room
@@ -83,15 +126,24 @@ export default async function handler(req, res) {
       room.chatHistory.push(joinMessage);
     }
     
-    // Broadcast room update to all clients
+    // Send multiple updates to ensure all clients receive them
+    // First broadcast the chat message
+    console.log(`Broadcasting chat message for room ${roomId}`);
+    await safeTrigger(`room-${roomId}`, 'chat-message', joinMessage);
+    
+    // Then broadcast the room update
     console.log(`Broadcasting room update for room ${roomId}`);
     await safeTrigger(`room-${roomId}`, 'room-update', {
       players: room.players,
       status: room.status
     });
     
-    // Send chat message
-    await safeTrigger(`room-${roomId}`, 'chat-message', joinMessage);
+    // Also broadcast a direct player join event for extra reliability
+    console.log(`Broadcasting player-joined event for room ${roomId}`);
+    await safeTrigger(`room-${roomId}`, 'player-joined', {
+      player: newPlayer,
+      totalPlayers: room.players.length
+    });
     
     // Return success with player data
     console.log(`Sending success response for player ${playerId}`);

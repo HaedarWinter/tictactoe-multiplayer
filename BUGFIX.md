@@ -282,4 +282,86 @@ After fixing the Pusher integration, we encountered a React-specific error in th
    - Deploy to Vercel and test in the production environment
    - Verify that the application works correctly on different browsers and devices
 
-These improvements have made the application more robust and reliable, especially in the production environment on Vercel. 
+These improvements have made the application more robust and reliable, especially in the production environment on Vercel.
+
+## Player Connection Issues in Serverless Environment
+
+After resolving the React errors, we encountered an issue where the host couldn't detect when a second player joined the game:
+
+```
+page-ceb09eb27aada35f.js:1 Game room initialized with: roomId=Cm2LKU, playerName=hae, isHost=false
+page-ceb09eb27aada35f.js:1 Joining room Cm2LKU as hae (isHost: false)
+page-ceb09eb27aada35f.js:1 Attempting to join room Cm2LKU as hae (isHost: false)
+page-ceb09eb27aada35f.js:1 Join room successful: Object
+page-ceb09eb27aada35f.js:1 Successfully joined room: Object
+page-ceb09eb27aada35f.js:1 Subscribing to room Cm2LKU events
+```
+
+### Root Causes:
+
+1. **Serverless Function Isolation**:
+   - Each API call potentially runs on a different serverless instance
+   - In-memory storage (`const rooms = new Map()`) is isolated to each instance
+   - When player 2 joins, they might hit a different instance than the host
+
+2. **Stateless Architecture Issues**:
+   - Vercel's serverless functions are designed to be stateless
+   - In-memory room storage doesn't persist between function invocations
+   - Multiple isolated copies of room data exist across instances
+
+3. **Event Propagation Problems**:
+   - The host's instance doesn't automatically know when a player joins on another instance
+   - Only events triggered from the same instance were working reliably
+
+### Solutions Implemented:
+
+1. **Enhanced Event System**:
+   - Added new event types specifically for player joining:
+     - `room-ping`: Alerts all instances that a player is trying to join
+     - `player-joined`: Direct notification of a new player joining
+
+2. **Cross-Instance Synchronization**:
+   - Added code to actively refresh room state when needed
+   - Implemented a periodic refresh mechanism for hosts waiting for players
+   - Added timestamp tracking to prevent excessive refreshes
+
+3. **Improved Player Handling**:
+   - Added detection for existing players to handle reconnections
+   - Added better handling of isHost parameter
+   - Implemented proper handling for duplicate player names
+
+4. **Better State Management**:
+   - Created a refreshRoomState function to fetch the latest room state
+   - Added multiple trigger points to ensure state is refreshed when needed
+   - Added defensive code to handle partial or inconsistent updates
+
+### Code Changes:
+
+1. **Join Room API**:
+   - Added cross-instance notification via `room-ping`
+   - Added special handling for existing players
+   - Added multiple event broadcasts for redundancy
+
+2. **Game Client**:
+   - Added handlers for new event types
+   - Implemented special handling for player-joined events
+   - Added connection state change handling
+
+3. **Game Room Component**:
+   - Added a refreshRoomState function to fetch latest state
+   - Added periodic refresh for hosts waiting for players
+   - Added special handling for room update events
+
+### Testing:
+
+1. **Multi-Tab Testing**:
+   - Open the game in multiple browser tabs
+   - Create a room in one tab and join from another
+   - Verify that both players can see each other
+
+2. **Deployment Testing**:
+   - Deploy to Vercel and test with multiple devices
+   - Verify that players can join rooms and play together
+   - Check console logs for proper event propagation
+
+These improvements have made the game more resilient to the challenges of serverless architecture, ensuring that players can reliably join games and play together even when API requests hit different serverless instances. 

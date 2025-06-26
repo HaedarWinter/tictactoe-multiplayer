@@ -113,6 +113,44 @@ export default function GameRoom() {
   const [chatHistory, setChatHistory] = useState<any[]>([]);
   const [chatMessage, setChatMessage] = useState('');
   const [connectionStatus, setConnectionStatus] = useState('connecting');
+  const [lastRoomUpdate, setLastRoomUpdate] = useState<number>(0);
+  
+  // Function to refresh the room state - can be called after receiving events
+  const refreshRoomState = useCallback(async () => {
+    if (!roomId || !playerId || !playerName) return;
+    
+    try {
+      console.log(`Refreshing room state for ${roomId}`);
+      const response = await gameClient.joinRoom(roomId, playerName, isHost) as RoomResponse;
+      
+      if (response.success) {
+        setPlayers(response.room.players);
+        setGameStatus(response.room.status);
+        setChatHistory(response.room.chatHistory || []);
+        
+        if (response.room.board) {
+          setBoard(response.room.board);
+        }
+        
+        if (response.room.currentTurn !== undefined) {
+          setCurrentTurn(response.room.currentTurn);
+        }
+        
+        if (response.room.winner !== undefined) {
+          setWinner(response.room.winner);
+        }
+        
+        if (response.room.winningLine) {
+          setWinningLine(response.room.winningLine);
+        }
+        
+        console.log('Successfully refreshed room state:', response);
+      }
+    } catch (err: any) {
+      console.error('Error refreshing room state:', err);
+      // Don't set error state here to avoid disrupting the UI
+    }
+  }, [roomId, playerId, playerName, isHost]);
   
   // Join the room
   useEffect(() => {
@@ -173,11 +211,44 @@ export default function GameRoom() {
       onConnectionStateChange: (state: string) => {
         console.log(`Connection state changed to: ${state}`);
         setConnectionStatus(state);
+        
+        // If we reconnect, refresh room state
+        if (state === 'connected') {
+          refreshRoomState();
+        }
       },
       onRoomUpdate: (data: any) => {
         console.log('Room update received:', data);
-        setPlayers(data.players);
-        setGameStatus(data.status);
+        
+        // Special handling for player-joined event
+        if (data._playerJoinedEvent) {
+          console.log('Player joined event detected, refreshing room state');
+          refreshRoomState();
+          return;
+        }
+        
+        // Set a timestamp so we can track the last update
+        setLastRoomUpdate(Date.now());
+        
+        // Update players state - but check if the data includes players
+        if (data.players && Array.isArray(data.players)) {
+          // If we're the host and we don't have two players yet, we want to
+          // make sure we have the latest state since serverless functions 
+          // might have lost state
+          const currentPlayerCount = players.length;
+          const newPlayerCount = data.players.length;
+          
+          if (isHost && currentPlayerCount < 2 && newPlayerCount > currentPlayerCount) {
+            console.log('New player detected, refreshing room state');
+            refreshRoomState();
+          } else {
+            setPlayers(data.players);
+          }
+        }
+        
+        if (data.status) {
+          setGameStatus(data.status);
+        }
       },
       onGameUpdate: (data: any) => {
         console.log('Game update received:', data);
@@ -202,7 +273,25 @@ export default function GameRoom() {
       console.log('Unsubscribing from room events');
       subscription.unsubscribe();
     };
-  }, [roomId, playerId]);
+  }, [roomId, playerId, players.length, isHost, refreshRoomState]);
+  
+  // Refresh room state periodically if host with no second player
+  useEffect(() => {
+    if (!isHost || !roomId || !playerId || players.length >= 2 || gameStatus !== 'waiting') {
+      return;
+    }
+    
+    // Refresh room state every 5 seconds if we're waiting for players
+    const interval = setInterval(() => {
+      // Only refresh if it's been more than 5 seconds since the last update
+      if (Date.now() - lastRoomUpdate > 5000) {
+        console.log('Periodic room refresh (host waiting for players)');
+        refreshRoomState();
+      }
+    }, 5000);
+    
+    return () => clearInterval(interval);
+  }, [isHost, roomId, playerId, players.length, gameStatus, lastRoomUpdate, refreshRoomState]);
   
   // Start the game (host only)
   const startGame = async () => {

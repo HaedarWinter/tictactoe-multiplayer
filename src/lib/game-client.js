@@ -235,6 +235,32 @@ export const gameClient = {
         console.log(`Successfully subscribed to room ${roomId}`);
       });
       
+      // Room ping for synchronization
+      channel.bind('room-ping', (data) => {
+        console.log(`Room ping received for room ${roomId}:`, data);
+        // If we're hosting and someone is trying to join, this helps with serverless instance synchronization
+        if (data.action === 'join-attempt') {
+          console.log(`Player ${data.playerName} is attempting to join room ${roomId}`);
+        }
+      });
+      
+      // Player joined event - more direct than room-update
+      if (callbacks.onRoomUpdate) {
+        channel.bind('player-joined', (data) => {
+          console.log(`Player joined event received for room ${roomId}:`, data);
+          try {
+            // Update the players list using the standard room update callback
+            callbacks.onRoomUpdate({
+              players: [data.player], // This is incomplete but will trigger the UI to refresh
+              status: 'waiting',
+              _playerJoinedEvent: true // Flag to indicate this came from player-joined event
+            });
+          } catch (error) {
+            console.error('Error handling player joined event:', error);
+          }
+        });
+      }
+      
       // Room updates (players joining/leaving)
       if (callbacks.onRoomUpdate) {
         channel.bind('room-update', (data) => {
