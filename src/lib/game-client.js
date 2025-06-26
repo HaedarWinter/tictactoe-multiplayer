@@ -13,18 +13,46 @@ export const gameClient = {
    */
   async joinRoom(roomId, playerName, isHost) {
     try {
+      console.log(`Attempting to join room ${roomId} as ${playerName} (isHost: ${isHost})`);
+      
+      if (!roomId) {
+        console.error('Room ID is missing');
+        throw new Error('Room ID is required');
+      }
+      
+      if (!playerName) {
+        console.error('Player name is missing');
+        throw new Error('Player name is required');
+      }
+
+      const requestBody = { roomId, playerName, isHost };
+      console.log('Sending join request with body:', requestBody);
+      
       const response = await fetch('/api/game/join-room', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ roomId, playerName, isHost }),
+        body: JSON.stringify(requestBody),
       });
       
+      console.log(`Join room response status: ${response.status}`);
+      
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: `HTTP error ${response.status}` }));
-        throw new Error(errorData.message || `Failed to join room (${response.status})`);
+        let errorMessage;
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.message || `Failed to join room (HTTP ${response.status})`;
+        } catch (parseError) {
+          console.error('Error parsing error response:', parseError);
+          errorMessage = `HTTP error ${response.status}`;
+        }
+        
+        console.error(`Join room error: ${errorMessage}`);
+        throw new Error(errorMessage);
       }
       
-      return response.json();
+      const data = await response.json();
+      console.log('Join room successful:', data);
+      return data;
     } catch (error) {
       console.error('Error joining room:', error);
       throw error;
@@ -39,18 +67,39 @@ export const gameClient = {
    */
   async startGame(roomId, playerId) {
     try {
+      console.log(`Attempting to start game in room ${roomId} as player ${playerId}`);
+      
+      if (!roomId || !playerId) {
+        const errorMsg = !roomId ? 'Room ID is required' : 'Player ID is required';
+        console.error(errorMsg);
+        throw new Error(errorMsg);
+      }
+      
       const response = await fetch('/api/game/start-game', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ roomId, playerId }),
       });
       
+      console.log(`Start game response status: ${response.status}`);
+      
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: `HTTP error ${response.status}` }));
-        throw new Error(errorData.message || `Failed to start game (${response.status})`);
+        let errorMessage;
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.message || `Failed to start game (HTTP ${response.status})`;
+        } catch (parseError) {
+          console.error('Error parsing error response:', parseError);
+          errorMessage = `HTTP error ${response.status}`;
+        }
+        
+        console.error(`Start game error: ${errorMessage}`);
+        throw new Error(errorMessage);
       }
       
-      return response.json();
+      const data = await response.json();
+      console.log('Start game successful:', data);
+      return data;
     } catch (error) {
       console.error('Error starting game:', error);
       throw error;
@@ -66,18 +115,39 @@ export const gameClient = {
    */
   async makeMove(roomId, playerId, position) {
     try {
+      console.log(`Attempting to make move at position ${position} in room ${roomId} as player ${playerId}`);
+      
+      if (!roomId || !playerId || position === undefined) {
+        const errorMsg = !roomId ? 'Room ID is required' : !playerId ? 'Player ID is required' : 'Position is required';
+        console.error(errorMsg);
+        throw new Error(errorMsg);
+      }
+      
       const response = await fetch('/api/game/make-move', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ roomId, playerId, position }),
       });
       
+      console.log(`Make move response status: ${response.status}`);
+      
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: `HTTP error ${response.status}` }));
-        throw new Error(errorData.message || `Failed to make move (${response.status})`);
+        let errorMessage;
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.message || `Failed to make move (HTTP ${response.status})`;
+        } catch (parseError) {
+          console.error('Error parsing error response:', parseError);
+          errorMessage = `HTTP error ${response.status}`;
+        }
+        
+        console.error(`Make move error: ${errorMessage}`);
+        throw new Error(errorMessage);
       }
       
-      return response.json();
+      const data = await response.json();
+      console.log('Make move successful:', data);
+      return data;
     } catch (error) {
       console.error('Error making move:', error);
       throw error;
@@ -93,18 +163,39 @@ export const gameClient = {
    */
   async sendMessage(roomId, playerId, message) {
     try {
+      console.log(`Attempting to send message in room ${roomId} as player ${playerId}`);
+      
+      if (!roomId || !playerId || !message) {
+        const errorMsg = !roomId ? 'Room ID is required' : !playerId ? 'Player ID is required' : 'Message is required';
+        console.error(errorMsg);
+        throw new Error(errorMsg);
+      }
+      
       const response = await fetch('/api/game/send-message', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ roomId, playerId, message }),
       });
       
+      console.log(`Send message response status: ${response.status}`);
+      
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: `HTTP error ${response.status}` }));
-        throw new Error(errorData.message || `Failed to send message (${response.status})`);
+        let errorMessage;
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.message || `Failed to send message (HTTP ${response.status})`;
+        } catch (parseError) {
+          console.error('Error parsing error response:', parseError);
+          errorMessage = `HTTP error ${response.status}`;
+        }
+        
+        console.error(`Send message error: ${errorMessage}`);
+        throw new Error(errorMessage);
       }
       
-      return response.json();
+      const data = await response.json();
+      console.log('Send message successful:', data);
+      return data;
     } catch (error) {
       console.error('Error sending message:', error);
       throw error;
@@ -121,26 +212,33 @@ export const gameClient = {
     let channel;
     
     try {
+      console.log(`Subscribing to room ${roomId} events`);
       channel = pusherClient.subscribe(`room-${roomId}`);
       
       // Connection status events
       if (callbacks.onConnectionStateChange) {
         pusherClient.connection.bind('state_change', ({ current }) => {
+          console.log(`Pusher connection state changed to: ${current}`);
           callbacks.onConnectionStateChange(current);
         });
       }
       
       // Handle subscription errors
       channel.bind('pusher:subscription_error', (status) => {
-        console.error('Pusher subscription error:', status);
+        console.error(`Pusher subscription error (${status}) for room ${roomId}`);
         if (callbacks.onError) {
           callbacks.onError(`Failed to subscribe to room events (${status})`);
         }
       });
       
+      channel.bind('pusher:subscription_succeeded', () => {
+        console.log(`Successfully subscribed to room ${roomId}`);
+      });
+      
       // Room updates (players joining/leaving)
       if (callbacks.onRoomUpdate) {
         channel.bind('room-update', (data) => {
+          console.log(`Room update received for room ${roomId}:`, data);
           try {
             callbacks.onRoomUpdate(data);
           } catch (error) {
@@ -152,6 +250,7 @@ export const gameClient = {
       // Game updates (moves, game state changes)
       if (callbacks.onGameUpdate) {
         channel.bind('game-update', (data) => {
+          console.log(`Game update received for room ${roomId}:`, data);
           try {
             callbacks.onGameUpdate(data);
           } catch (error) {
@@ -163,6 +262,7 @@ export const gameClient = {
       // Chat messages
       if (callbacks.onChatMessage) {
         channel.bind('chat-message', (data) => {
+          console.log(`Chat message received for room ${roomId}:`, data);
           try {
             callbacks.onChatMessage(data);
           } catch (error) {
@@ -171,7 +271,7 @@ export const gameClient = {
         });
       }
     } catch (error) {
-      console.error('Error subscribing to room:', error);
+      console.error(`Error subscribing to room ${roomId}:`, error);
       if (callbacks.onError) {
         callbacks.onError(`Failed to subscribe to room: ${error.message}`);
       }
@@ -188,6 +288,7 @@ export const gameClient = {
       unsubscribe: () => {
         try {
           if (channel) {
+            console.log(`Unsubscribing from room ${roomId}`);
             channel.unbind_all();
             pusherClient.unsubscribe(`room-${roomId}`);
           }
@@ -197,7 +298,7 @@ export const gameClient = {
             pusherClient.connection.unbind('state_change');
           }
         } catch (error) {
-          console.error('Error unsubscribing from room:', error);
+          console.error(`Error unsubscribing from room ${roomId}:`, error);
         }
       }
     };

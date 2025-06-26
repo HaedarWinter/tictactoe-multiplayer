@@ -59,7 +59,8 @@ export default function GameRoom() {
   
   // Player info from URL or localStorage
   const playerName = searchParams?.get('playerName') || localStorage.getItem('playerName') || '';
-  const isHost = searchParams?.get('isHost') === 'true' || localStorage.getItem('isHost') === 'true';
+  const isHostParam = searchParams?.get('isHost');
+  const isHost = isHostParam === 'true' || (isHostParam === null && localStorage.getItem('isHost') === 'true');
   
   // Game state
   const [loading, setLoading] = useState(true);
@@ -250,6 +251,16 @@ export default function GameRoom() {
       </div>
     );
   }
+  
+  useEffect(() => {
+    // Store current parameters in localStorage
+    if (playerName) {
+      localStorage.setItem('playerName', playerName);
+    }
+    localStorage.setItem('isHost', isHost ? 'true' : 'false');
+    
+    console.log(`Game room initialized with: roomId=${roomId}, playerName=${playerName}, isHost=${isHost}`);
+  }, [roomId, playerName, isHost]);
   
   return (
     <div className="min-h-screen bg-slate-900 p-4 text-white">

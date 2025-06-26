@@ -9,9 +9,11 @@ export default async function handler(req, res) {
   }
 
   try {
+    console.log('Join room request received:', req.body);
     const { roomId, playerName, isHost } = req.body;
 
     if (!roomId || !playerName) {
+      console.log('Missing required fields:', { roomId, playerName });
       return res.status(400).json({ message: 'Missing required fields' });
     }
 
@@ -20,10 +22,9 @@ export default async function handler(req, res) {
     
     // Create or update the room
     if (!rooms.has(roomId)) {
-      // Only hosts can create rooms
-      if (!isHost) {
-        return res.status(404).json({ message: 'Room not found' });
-      }
+      // If room doesn't exist, anyone can create it (but they'll be marked as host)
+      // This handles the issue with serverless functions where rooms may get reset
+      console.log(`Room ${roomId} not found, creating new room`);
       
       // Create new room
       rooms.set(roomId, {
@@ -41,26 +42,34 @@ export default async function handler(req, res) {
     }
     
     const room = rooms.get(roomId);
+    console.log(`Current room state: ${JSON.stringify(room)}`);
     
     // Check if room is full
     if (room.players.length >= 2) {
+      console.log(`Room ${roomId} is full`);
       return res.status(400).json({ message: 'Room is full' });
     }
     
+    // If this is the first player, make them the host regardless of isHost parameter
+    let shouldBeHost = room.players.length === 0 ? true : isHost;
+    
     // Check if host role is already taken
-    if (isHost && room.players.some(p => p.isHost)) {
-      return res.status(400).json({ message: 'Room already has a host' });
+    if (shouldBeHost && room.players.some(p => p.isHost)) {
+      console.log(`Room ${roomId} already has a host`);
+      // If host role is taken, let them join as a non-host
+      shouldBeHost = false;
     }
     
     // Add player to room
     const newPlayer = {
       id: playerId,
       name: playerName,
-      isHost: isHost,
+      isHost: shouldBeHost,
       score: 0
     };
     
     room.players.push(newPlayer);
+    console.log(`Player ${playerName} (${playerId}) added to room ${roomId}`);
     
     // Add system message
     const joinMessage = {
@@ -75,6 +84,7 @@ export default async function handler(req, res) {
     }
     
     // Broadcast room update to all clients
+    console.log(`Broadcasting room update for room ${roomId}`);
     await safeTrigger(`room-${roomId}`, 'room-update', {
       players: room.players,
       status: room.status
@@ -84,6 +94,7 @@ export default async function handler(req, res) {
     await safeTrigger(`room-${roomId}`, 'chat-message', joinMessage);
     
     // Return success with player data
+    console.log(`Sending success response for player ${playerId}`);
     res.status(200).json({
       success: true,
       playerId,
