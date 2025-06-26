@@ -24,8 +24,7 @@ export const initSocket = async (
     console.log('Connecting to socket URL:', socketUrl);
     
     // Buat instance socket baru dengan konfigurasi yang lebih lengkap
-    socket = io(socketUrl, {
-      path: '/socket.io',
+    const socketOptions = {
       reconnectionAttempts: 10,
       reconnectionDelay: 1000,
       timeout: 20000,
@@ -36,7 +35,10 @@ export const initSocket = async (
         playerName,
         isHost: isHost ? 'true' : 'false',
       },
-    });
+    };
+    
+    console.log('Socket.io options:', JSON.stringify(socketOptions));
+    socket = io(socketUrl, socketOptions);
 
     return new Promise((resolve, reject) => {
       if (!socket) return reject(new Error('Failed to create socket'));

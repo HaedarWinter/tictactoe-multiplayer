@@ -98,7 +98,7 @@ export default function SocketHandler(req: NextApiRequest, res: NextApiResponseW
 
   console.log('Setting up Socket.io server...');
 
-  // Membuat instance server Socket.io dengan konfigurasi CORS yang lebih lengkap
+  // Membuat instance server Socket.io dengan konfigurasi CORS yang lebih sederhana
   io = new Server({
     cors: {
       origin: "*",
@@ -107,8 +107,7 @@ export default function SocketHandler(req: NextApiRequest, res: NextApiResponseW
       credentials: true
     },
     transports: ['websocket', 'polling'],
-    allowEIO3: true,
-    path: '/socket.io/'
+    allowEIO3: true
   });
 
   // Pasang server Socket.io ke server HTTP Next.js
