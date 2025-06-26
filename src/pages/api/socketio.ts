@@ -74,6 +74,7 @@ export default function SocketHandler(req: NextApiRequest, res: NextApiResponseW
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
 
   // Menangani preflight request
   if (req.method === 'OPTIONS') {
@@ -97,7 +98,7 @@ export default function SocketHandler(req: NextApiRequest, res: NextApiResponseW
 
   console.log('Setting up Socket.io server...');
 
-  // Membuat instance server Socket.io dengan konfigurasi CORS yang lebih sederhana
+  // Membuat instance server Socket.io dengan konfigurasi CORS yang lebih lengkap
   io = new Server({
     cors: {
       origin: "*",
@@ -106,7 +107,8 @@ export default function SocketHandler(req: NextApiRequest, res: NextApiResponseW
       credentials: true
     },
     transports: ['websocket', 'polling'],
-    allowEIO3: true
+    allowEIO3: true,
+    path: '/socket.io/'
   });
 
   // Pasang server Socket.io ke server HTTP Next.js

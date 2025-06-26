@@ -23,9 +23,9 @@ export const initSocket = async (
     const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || window.location.origin;
     console.log('Connecting to socket URL:', socketUrl);
     
-    // Buat instance socket baru dengan konfigurasi yang sederhana
+    // Buat instance socket baru dengan konfigurasi yang lebih lengkap
     socket = io(socketUrl, {
-      path: '/api/socketio',
+      path: '/socket.io',
       reconnectionAttempts: 10,
       reconnectionDelay: 1000,
       timeout: 20000,
