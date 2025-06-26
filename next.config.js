@@ -5,9 +5,13 @@ const nextConfig = {
   async rewrites() {
     return [
       {
-        source: '/socket.io/:path*',
-        destination: '/api/socketio',
+        source: '/api/socket.io',
+        destination: '/api/socket.io.js',
       },
+      {
+        source: '/api/socket.io/:path*',
+        destination: '/api/socket.io.js',
+      }
     ];
   },
 };
