@@ -1,221 +1,159 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { nanoid } from 'nanoid';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 
 export default function Home() {
-  const [playerName, setPlayerName] = useState('');
-  const [roomId, setRoomId] = useState('');
-  const [error, setError] = useState('');
-  const [activeTab, setActiveTab] = useState<'create' | 'join'>('create');
   const router = useRouter();
+  const [roomId, setRoomId] = useState('');
+  const [playerName, setPlayerName] = useState('');
+  const [joinRoomId, setJoinRoomId] = useState('');
+  const [error, setError] = useState('');
 
+  // Load player name from localStorage if available
   useEffect(() => {
-    // Generate random room ID
-    setRoomId(nanoid(6));
-    
-    // Load previous player name if available
     const savedName = localStorage.getItem('playerName');
     if (savedName) {
       setPlayerName(savedName);
     }
   }, []);
 
-  const createRoom = () => {
-    if (!playerName) {
-      setError('Silakan masukkan nama pemain!');
-      return;
+  // Generate a random room ID
+  const generateRoomId = () => {
+    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    let result = '';
+    for (let i = 0; i < 6; i++) {
+      result += characters.charAt(Math.floor(Math.random() * characters.length));
     }
-    
-    // Save player info in localStorage
-    localStorage.setItem('playerName', playerName);
-    localStorage.setItem('isNewHost', 'true');
-    
-    router.push(`/game/${roomId}`);
+    setRoomId(result);
   };
 
-  const joinRoom = () => {
-    if (!playerName) {
-      setError('Silakan masukkan nama pemain!');
+  // Create a new game
+  const createGame = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!playerName.trim()) {
+      setError('Please enter your name');
       return;
     }
     
-    if (!roomId || roomId.length < 6) {
-      setError('Kode room tidak valid!');
+    if (!roomId) {
+      generateRoomId();
       return;
     }
     
-    // Save player info in localStorage
+    // Save player name for future use
     localStorage.setItem('playerName', playerName);
-    localStorage.setItem('isNewHost', 'false');
+    localStorage.setItem('isHost', 'true');
     
-    router.push(`/game/${roomId}`);
+    // Navigate to the game room
+    router.push(`/game/${roomId}?playerName=${encodeURIComponent(playerName)}&isHost=true`);
+  };
+
+  // Join an existing game
+  const joinGame = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!playerName.trim()) {
+      setError('Please enter your name');
+      return;
+    }
+    
+    if (!joinRoomId.trim()) {
+      setError('Please enter a room ID');
+      return;
+    }
+    
+    // Save player name for future use
+    localStorage.setItem('playerName', playerName);
+    localStorage.setItem('isHost', 'false');
+    
+    // Navigate to the game room
+    router.push(`/game/${joinRoomId}?playerName=${encodeURIComponent(playerName)}&isHost=false`);
   };
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-4 bg-background">
-      <div className="w-full max-w-md mx-auto">
-        <motion.div 
-          className="card w-full shadow-lg"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-        >
-          <motion.div 
-            className="flex flex-col items-center mb-6"
-            initial={{ scale: 0.9 }}
-            animate={{ scale: 1 }}
-            transition={{ duration: 0.5 }}
-          >
-            <h1 className="text-3xl sm:text-4xl font-bold text-center mb-2 bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-              Tic-Tac-Toe Online
-            </h1>
-            <p className="text-center text-gray-400">Bermain bersama teman secara online</p>
-          </motion.div>
-          
-          {error && (
-            <motion.div 
-              className="bg-red-900 bg-opacity-50 p-3 rounded-md mb-4 text-center"
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-            >
-              {error}
-              <button 
-                className="ml-2 text-xs underline"
-                onClick={() => setError('')}
-              >
-                Tutup
-              </button>
-            </motion.div>
-          )}
-          
-          <div className="mb-6">
-            <label htmlFor="name" className="block mb-2 font-medium">Nama Pemain</label>
-            <input
-              id="name"
-              type="text"
-              className="input w-full"
-              value={playerName}
-              onChange={(e) => setPlayerName(e.target.value)}
-              placeholder="Masukkan nama pemain"
-              maxLength={15}
-              autoComplete="off"
-            />
-          </div>
-          
-          <div className="mb-6">
-            <div className="flex border-b border-gray-700 mb-4">
-              <button
-                className={`flex-1 py-2 font-medium transition-all duration-200 ${activeTab === 'create' ? 'text-primary border-b-2 border-primary' : 'text-gray-400 hover:text-gray-300'}`}
-                onClick={() => setActiveTab('create')}
-              >
-                Buat Room
-              </button>
-              <button
-                className={`flex-1 py-2 font-medium transition-all duration-200 ${activeTab === 'join' ? 'text-primary border-b-2 border-primary' : 'text-gray-400 hover:text-gray-300'}`}
-                onClick={() => setActiveTab('join')}
-              >
-                Gabung Room
-              </button>
-            </div>
-            
-            {activeTab === 'create' ? (
-              <motion.div
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 20 }}
-                transition={{ duration: 0.3 }}
-                className="space-y-4"
-              >
-                <div>
-                  <label htmlFor="createRoomId" className="block mb-2 font-medium">Kode Room</label>
-                  <div className="flex">
-                    <input
-                      id="createRoomId"
-                      type="text"
-                      className="input w-full font-mono uppercase"
-                      value={roomId}
-                      onChange={(e) => setRoomId(e.target.value.toUpperCase())}
-                      placeholder="Kode room otomatis"
-                      maxLength={6}
-                    />
-                    <motion.button
-                      className="ml-2 btn btn-secondary"
-                      onClick={() => setRoomId(nanoid(6).toUpperCase())}
-                      title="Generate kode baru"
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                    >
-                      🔄
-                    </motion.button>
-                  </div>
-                  <p className="text-xs text-gray-400 mt-1">Kode room akan dibuat otomatis</p>
-                </div>
-                
-                <motion.button
-                  className="btn btn-primary w-full shadow-glow"
-                  onClick={createRoom}
-                  whileHover={{ scale: 1.03 }}
-                  whileTap={{ scale: 0.97 }}
-                  animate={{ 
-                    boxShadow: ['0 0 0px rgba(139, 92, 246, 0)', '0 0 15px rgba(139, 92, 246, 0.5)', '0 0 0px rgba(139, 92, 246, 0)'],
-                  }}
-                  transition={{ duration: 2, repeat: Infinity }}
-                >
-                  Buat Room Baru
-                </motion.button>
-              </motion.div>
-            ) : (
-              <motion.div
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                transition={{ duration: 0.3 }}
-                className="space-y-4"
-              >
-                <div>
-                  <label htmlFor="joinRoomId" className="block mb-2 font-medium">Kode Room</label>
-                  <input
-                    id="joinRoomId"
-                    type="text"
-                    className="input w-full font-mono uppercase"
-                    value={roomId}
-                    onChange={(e) => setRoomId(e.target.value.toUpperCase())}
-                    placeholder="Masukkan kode room"
-                    maxLength={6}
-                  />
-                  <p className="text-xs text-gray-400 mt-1">Masukkan kode yang dibagikan teman Anda</p>
-                </div>
-                
-                <motion.button
-                  className="btn btn-secondary w-full shadow-glow-secondary"
-                  onClick={joinRoom}
-                  whileHover={{ scale: 1.03 }}
-                  whileTap={{ scale: 0.97 }}
-                >
-                  Gabung Room
-                </motion.button>
-              </motion.div>
-            )}
-          </div>
-          
-          <div className="text-center text-sm text-gray-400">
-            <p>Bermain Tic-Tac-Toe dengan teman secara online</p>
-            <p className="mt-1">Buat room atau gabung ke room yang sudah ada</p>
-          </div>
-        </motion.div>
+    <main className="flex min-h-screen flex-col items-center justify-center p-4 bg-gray-100">
+      <div className="max-w-md w-full bg-white rounded-lg shadow-md p-6">
+        <h1 className="text-3xl font-bold text-center mb-6">Tic Tac Toe Multiplayer</h1>
         
-        <motion.div 
-          className="mt-8 text-center text-xs text-gray-500"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 1, duration: 1 }}
-        >
-          <p>Dibuat dengan ❤️ menggunakan Next.js dan Socket.io</p>
-        </motion.div>
+        {error && (
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+            {error}
+          </div>
+        )}
+        
+        <div className="mb-6">
+          <label htmlFor="playerName" className="block text-gray-700 mb-2">Your Name</label>
+          <input
+            type="text"
+            id="playerName"
+            value={playerName}
+            onChange={(e) => setPlayerName(e.target.value)}
+            className="w-full p-2 border rounded"
+            placeholder="Enter your name"
+          />
+        </div>
+        
+        <div className="space-y-6">
+          <div className="border-t pt-4">
+            <h2 className="text-xl font-semibold mb-4">Create a New Game</h2>
+            <form onSubmit={createGame}>
+              <div className="mb-4">
+                <label htmlFor="roomId" className="block text-gray-700 mb-2">Room ID (optional)</label>
+                <div className="flex space-x-2">
+                  <input
+                    type="text"
+                    id="roomId"
+                    value={roomId}
+                    onChange={(e) => setRoomId(e.target.value)}
+                    className="w-full p-2 border rounded"
+                    placeholder="Random ID will be generated"
+                  />
+                  <button
+                    type="button"
+                    onClick={generateRoomId}
+                    className="bg-gray-200 px-4 py-2 rounded"
+                  >
+                    Generate
+                  </button>
+                </div>
+              </div>
+              <button
+                type="submit"
+                className="w-full bg-blue-500 text-white py-2 rounded hover:bg-blue-600"
+              >
+                Create Game
+              </button>
+            </form>
+          </div>
+          
+          <div className="border-t pt-4">
+            <h2 className="text-xl font-semibold mb-4">Join a Game</h2>
+            <form onSubmit={joinGame}>
+              <div className="mb-4">
+                <label htmlFor="joinRoomId" className="block text-gray-700 mb-2">Room ID</label>
+                <input
+                  type="text"
+                  id="joinRoomId"
+                  value={joinRoomId}
+                  onChange={(e) => setJoinRoomId(e.target.value)}
+                  className="w-full p-2 border rounded"
+                  placeholder="Enter room ID"
+                />
+              </div>
+              <button
+                type="submit"
+                className="w-full bg-green-500 text-white py-2 rounded hover:bg-green-600"
+              >
+                Join Game
+              </button>
+            </form>
+          </div>
+        </div>
       </div>
       
       {/* Background elements */}

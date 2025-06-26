@@ -1,91 +1,93 @@
-# Panduan Deploy Game Tic-Tac-Toe Multiplayer
+# Deployment Guide for Tic-Tac-Toe Multiplayer
 
-## Langkah 1: Upload ke GitHub
+This guide will help you deploy your Tic-Tac-Toe Multiplayer game on Vercel.
 
-1. Buka [GitHub](https://github.com) dan login
-2. Klik tombol "New" untuk membuat repositori baru
-3. Beri nama repositori (misalnya "tictactoe-multiplayer")
-4. Biarkan repositori sebagai Public
-5. Klik "Create repository"
-6. Ikuti instruksi di halaman untuk push kode dari repositori lokal:
+## Prerequisites
 
-```bash
-git remote add origin https://github.com/USERNAME/NAMA-REPOSITORI.git
-git branch -M main
-git push -u origin main
+- A [Vercel](https://vercel.com) account
+- A [Pusher](https://pusher.com) account (free tier is sufficient)
+
+## Step 1: Set up Pusher
+
+1. Sign up or log in to [Pusher](https://pusher.com)
+2. Create a new Channels app
+3. Select a name for your app (e.g., "tic-tac-toe-multiplayer")
+4. Choose a cluster closest to your target audience
+5. Take note of your Pusher credentials:
+   - App ID
+   - Key
+   - Secret
+   - Cluster
+
+## Step 2: Update Environment Variables
+
+1. In your local project, create a `.env.local` file (if it doesn't exist)
+2. Add the following variables with your Pusher credentials:
+
+```
+NEXT_PUBLIC_PUSHER_APP_ID=your_app_id
+NEXT_PUBLIC_PUSHER_KEY=your_key
+PUSHER_SECRET=your_secret
+NEXT_PUBLIC_PUSHER_CLUSTER=your_cluster
 ```
 
-## Langkah 2: Deploy ke Vercel
+## Step 3: Deploy to Vercel
 
-1. Buka [Vercel](https://vercel.com) dan login (bisa menggunakan akun GitHub)
-2. Klik "Add New..." > "Project"
-3. Hubungkan dengan akun GitHub Anda
-4. Pilih repositori yang baru saja Anda buat
-5. Konfigurasi project:
-   - Framework Preset: Next.js
-   - Root Directory: ./
-   - Build Command: next build
-   - Output Directory: .next
-   - Install Command: npm install
+1. Push your code to a GitHub repository
+2. Log in to [Vercel](https://vercel.com)
+3. Click "New Project"
+4. Import your GitHub repository
+5. In the "Configure Project" screen:
+   - Add the environment variables from Step 2
+   - Optionally, change the project name
+6. Click "Deploy"
 
-6. Tambahkan Environment Variables (jika diperlukan):
-   - NEXT_PUBLIC_SOCKET_URL: https://${VERCEL_URL}
+## Step 4: Test Your Deployment
 
-7. Klik "Deploy"
-
-## Keuntungan Deploy di Vercel
-
-1. **HTTPS secara otomatis** - Semua koneksi aman tanpa konfigurasi tambahan
-2. **WebSocket Support** - Vercel mendukung WebSocket yang diperlukan untuk Socket.io
-3. **Skalabilitas** - Dapat menangani banyak pemain secara bersamaan
-4. **Global CDN** - Konten statis disampaikan dengan cepat di seluruh dunia
-5. **Mudah di-deploy** - Cukup hubungkan dengan GitHub dan deploy otomatis
-
-## Cara Bermain Online
-
-Setelah di-deploy ke Vercel, aplikasi Anda akan:
-
-1. Memiliki HTTPS secara otomatis
-2. Tersedia secara online dengan URL `https://nama-project.vercel.app`
-3. Dapat diakses oleh siapa saja di internet
-
-Untuk bermain online dengan orang lain:
-1. Host membuat room dengan mengakses URL aplikasi
-2. Host mendapatkan kode room (misalnya: `ABC123`)
-3. Host membagikan URL dengan kode room kepada pemain lain (misalnya: `https://nama-project.vercel.app/game/ABC123`)
-4. Pemain lain mengklik link tersebut dan bergabung ke room
+1. Once deployment is complete, visit your Vercel project URL
+2. Create a new game and copy the room ID
+3. Open another browser or incognito window
+4. Join the game using the room ID
+5. Verify that both players can see each other and play the game
 
 ## Troubleshooting
 
-Jika mengalami masalah dengan WebSocket di Vercel:
+If you encounter issues:
 
-1. Pastikan konfigurasi `vercel.json` sudah benar:
-```json
-{
-  "version": 2,
-  "builds": [
-    {
-      "src": "package.json",
-      "use": "@vercel/next"
-    }
-  ],
-  "env": {
-    "NEXT_PUBLIC_SOCKET_URL": "https://${VERCEL_URL}"
-  },
-  "rewrites": [
-    {
-      "source": "/socket.io/(.*)",
-      "destination": "/api/socket"
-    }
-  ]
-}
-```
+1. **Pusher Connection Errors**:
+   - Verify your Pusher credentials are correct
+   - Check that environment variables are set correctly on Vercel
+   - Ensure your app is using the correct Pusher cluster
 
-2. Pastikan Socket.io client menggunakan URL yang benar:
-```typescript
-const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || '';
-socket = io(socketUrl, {
-  path: '/api/socket',
-  // ...konfigurasi lainnya
-});
-``` 
+2. **API Errors (404/500)**:
+   - Check Vercel deployment logs for any server-side errors
+   - Verify API routes are working correctly
+
+3. **Game State Issues**:
+   - Clear browser cache and reload the page
+   - Check browser console for any JavaScript errors
+
+## Additional Configuration
+
+### Custom Domain
+
+To use a custom domain:
+
+1. Go to your Vercel project settings
+2. Click on "Domains"
+3. Add your domain and follow Vercel's instructions to configure DNS
+
+### Scaling
+
+The default configuration uses Pusher's free tier, which includes:
+- 100 simultaneous connections
+- 200k messages per day
+
+For production use with higher traffic, consider upgrading your Pusher plan.
+
+## Support
+
+If you need help, feel free to:
+- Open an issue on GitHub
+- Contact the project maintainers
+- Refer to the [Pusher documentation](https://pusher.com/docs) or [Vercel documentation](https://vercel.com/docs) 

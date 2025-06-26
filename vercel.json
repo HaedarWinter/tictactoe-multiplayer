@@ -1,8 +1,7 @@
 {
   "version": 2,
   "rewrites": [
-    { "source": "/api/socket.io", "destination": "/api/socket.io" },
-    { "source": "/api/socket.io/(.*)", "destination": "/api/socket.io" }
+    { "source": "/api/game/:path*", "destination": "/api/game/:path*" }
   ],
   "headers": [
     {

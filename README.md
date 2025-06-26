@@ -1,54 +1,92 @@
-# Game Multiplayer Online
+# Tic-Tac-Toe Multiplayer
 
-Game multiplayer online untuk dua pemain dengan sistem kode room. Permainan yang disediakan adalah Tic-Tac-Toe (X dan O).
+A real-time multiplayer Tic-Tac-Toe game built with Next.js, TypeScript, and Pusher.
 
-## Fitur
+## Features
 
-- Sistem room dengan kode unik
-- Permainan Tic-Tac-Toe untuk dua pemain
-- Komunikasi real-time menggunakan Socket.io
-- Antarmuka yang responsif dengan Tailwind CSS
-- Dapat dihosting di Vercel
+- Real-time multiplayer gameplay
+- Room-based matchmaking with shareable codes
+- In-game chat system
+- Responsive design for desktop and mobile
+- Serverless architecture for easy deployment
 
-## Teknologi yang Digunakan
+## Technologies Used
 
-- Next.js 14
-- TypeScript
-- Socket.io
-- Tailwind CSS
-- Vercel (untuk hosting)
+- **Next.js**: React framework for server-rendered applications
+- **TypeScript**: Typed JavaScript for better developer experience
+- **Tailwind CSS**: Utility-first CSS framework for styling
+- **Pusher**: Real-time communication platform
+- **Vercel**: Deployment platform optimized for Next.js
 
-## Cara Menjalankan Lokal
+## Getting Started
 
-1. Clone repositori ini
-2. Install dependensi:
-   ```bash
-   npm install
-   ```
-3. Jalankan server pengembangan:
-   ```bash
-   npm run dev
-   ```
-4. Buka [http://localhost:3000](http://localhost:3000) di browser Anda
+### Prerequisites
 
-## Cara Bermain
+- Node.js 14+ and npm
 
-1. Buka halaman utama
-2. Masukkan nama pemain
-3. Pilih "Buat Room Baru" untuk membuat room baru
-4. Bagikan kode room kepada teman Anda
-5. Teman Anda dapat bergabung dengan memasukkan kode room dan namanya
-6. Setelah dua pemain bergabung, host dapat memulai permainan
-7. Bermain secara bergantian hingga ada pemenang atau seri
-8. Pilih "Main Lagi" untuk memulai permainan baru
+### Installation
 
-## Deployment ke Vercel
+1. Clone the repository:
+```bash
+git clone https://github.com/yourusername/tictactoe-multiplayer.git
+cd tictactoe-multiplayer
+```
 
-1. Fork repositori ini
-2. Buat proyek baru di [Vercel](https://vercel.com)
-3. Hubungkan dengan repositori GitHub Anda
-4. Deploy!
+2. Install dependencies:
+```bash
+npm install
+```
 
-## Lisensi
+3. Create a `.env.local` file in the root directory and add your Pusher credentials:
+```
+NEXT_PUBLIC_PUSHER_APP_ID=your_app_id
+NEXT_PUBLIC_PUSHER_KEY=your_key
+PUSHER_SECRET=your_secret
+NEXT_PUBLIC_PUSHER_CLUSTER=your_cluster
+```
 
-MIT 
+4. Start the development server:
+```bash
+npm run dev
+```
+
+5. Open [http://localhost:3000](http://localhost:3000) in your browser to see the result.
+
+## How to Play
+
+1. On the home screen, enter your name and create a new game
+2. Share the room ID with a friend
+3. Wait for your friend to join
+4. The host (X) starts the game
+5. Take turns placing your symbols (X or O) on the board
+6. The first player to get three in a row wins!
+
+## Deployment
+
+See the [DEPLOY_GUIDE.md](DEPLOY_GUIDE.md) for detailed instructions on deploying to Vercel.
+
+## Project Structure
+
+```
+/
+├── public/             # Static assets
+├── src/
+│   ├── app/            # Next.js app directory
+│   │   ├── game/       # Game room page
+│   │   └── page.tsx    # Home page
+│   ├── components/     # React components
+│   ├── lib/            # Utility functions and libraries
+│   │   ├── pusher.js   # Pusher configuration
+│   │   └── game-client.js # Game client utilities
+│   └── pages/          # API routes
+│       └── api/        # API endpoints
+└── ...                 # Configuration files
+```
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details. 
