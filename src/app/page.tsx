@@ -15,6 +15,12 @@ export default function Home() {
   useEffect(() => {
     // Generate random room ID
     setRoomId(nanoid(6));
+    
+    // Load previous player name if available
+    const savedName = localStorage.getItem('playerName');
+    if (savedName) {
+      setPlayerName(savedName);
+    }
   }, []);
 
   const createRoom = () => {
@@ -23,7 +29,11 @@ export default function Home() {
       return;
     }
     
-    router.push(`/game/${roomId}?name=${encodeURIComponent(playerName)}&host=true`);
+    // Save player info in localStorage
+    localStorage.setItem('playerName', playerName);
+    localStorage.setItem('isNewHost', 'true');
+    
+    router.push(`/game/${roomId}`);
   };
 
   const joinRoom = () => {
@@ -37,7 +47,11 @@ export default function Home() {
       return;
     }
     
-    router.push(`/game/${roomId}?name=${encodeURIComponent(playerName)}&host=false`);
+    // Save player info in localStorage
+    localStorage.setItem('playerName', playerName);
+    localStorage.setItem('isNewHost', 'false');
+    
+    router.push(`/game/${roomId}`);
   };
 
   return (

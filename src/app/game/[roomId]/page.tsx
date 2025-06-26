@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useParams, useSearchParams } from 'next/navigation';
-import { io, Socket } from 'socket.io-client';
+import React, { useState, useEffect } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import { Socket } from 'socket.io-client';
 import WaitingRoom from '@/components/WaitingRoom';
 import GameBoard from '@/components/GameBoard';
-import { motion } from 'framer-motion';
+import { initializeSocket, disconnectSocket } from '@/lib/socket-helper';
 
 // Tipe untuk data pemain
 type Player = {
@@ -18,175 +18,164 @@ type Player = {
 // Tipe untuk status game
 type GameStatus = 'waiting' | 'playing' | 'finished';
 
-type Room = {
-  players: Player[];
-  status: GameStatus;
-};
-
 export default function GamePage() {
+  const router = useRouter();
   const params = useParams<{ roomId: string }>();
-  const searchParams = useSearchParams();
   const roomId = params?.roomId || '';
-  const playerName = searchParams?.get('name') || 'Anonim';
-  const isHost = searchParams?.get('host') === 'true';
-  
+  const [playerName, setPlayerName] = useState<string>('');
+  const [isHost, setIsHost] = useState<boolean>(false);
   const [socket, setSocket] = useState<Socket | null>(null);
-  const [room, setRoom] = useState<Room | null>(null);
   const [currentPlayer, setCurrentPlayer] = useState<Player | null>(null);
   const [opponent, setOpponent] = useState<Player | null>(null);
-  const [error, setError] = useState<string>('');
-  const [connecting, setConnecting] = useState<boolean>(true);
+  const [gameStatus, setGameStatus] = useState<GameStatus>('waiting');
+  const [errorMessage, setErrorMessage] = useState<string>('');
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  // Koneksi ke socket server
+  // Effect untuk mendapatkan nama pemain dari localStorage
   useEffect(() => {
-    // Ambil URL dari window location
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = window.location.host;
-    const socketUrl = `${protocol}//${host}`;
+    const storedName = localStorage.getItem('playerName');
+    const isNewHost = localStorage.getItem('isNewHost') === 'true';
     
-    // Buat koneksi socket
-    const newSocket = io(socketUrl, {
-      query: {
-        roomId,
-        playerName,
-        isHost,
-      },
-    });
+    if (storedName) {
+      setPlayerName(storedName);
+      setIsHost(isNewHost);
+    } else {
+      router.push('/');
+    }
+    
+    // Clear isNewHost flag setelah digunakan
+    localStorage.removeItem('isNewHost');
+  }, [router]);
 
-    // Event saat terhubung
-    newSocket.on('connect', () => {
-      console.log('Connected to server');
-      setConnecting(false);
-    });
-
-    // Event saat error
-    newSocket.on('error-message', (message: string) => {
-      setError(message);
-    });
-
-    // Event update room
-    newSocket.on('room-update', (updatedRoom: Room) => {
-      setRoom(updatedRoom);
+  // Effect untuk menginisialisasi socket
+  useEffect(() => {
+    if (!playerName || !roomId) return;
+    
+    try {
+      // Inisialisasi socket
+      const newSocket = initializeSocket(roomId, playerName, isHost);
+      setSocket(newSocket);
       
-      // Set pemain saat ini
-      const me = updatedRoom.players.find(player => player.id === newSocket.id);
-      setCurrentPlayer(me || null);
+      // Cleanup saat komponen di-unmount
+      return () => {
+        disconnectSocket(newSocket);
+        setSocket(null);
+      };
+    } catch (err) {
+      console.error('Error initializing socket:', err);
+      setErrorMessage('Gagal terhubung ke server. Silakan coba lagi.');
+    }
+  }, [playerName, roomId, isHost]);
+
+  // Effect untuk menangani event dari server
+  useEffect(() => {
+    if (!socket) return;
+
+    // Menangani update room
+    socket.on('room-update', (data: { players: Player[], status: GameStatus }) => {
+      const { players, status } = data;
       
-      // Set lawan
-      const opponent = updatedRoom.players.find(player => player.id !== newSocket.id);
-      setOpponent(opponent || null);
+      // Update status game
+      setGameStatus(status);
+      
+      // Update info pemain
+      const me = players.find(player => player.id === socket.id);
+      const otherPlayer = players.find(player => player.id !== socket.id);
+      
+      if (me) setCurrentPlayer(me);
+      if (otherPlayer) setOpponent(otherPlayer);
+      
+      setIsLoading(false);
     });
-
-    // Event saat koneksi terputus
-    newSocket.on('disconnect', () => {
-      console.log('Disconnected from server');
+    
+    // Menangani start game
+    socket.on('game-start', () => {
+      setGameStatus('playing');
     });
-
-    // Simpan socket ke state
-    setSocket(newSocket);
+    
+    // Menangani error
+    socket.on('error-message', (message: string) => {
+      setErrorMessage(message);
+    });
+    
+    // Menangani player left
+    socket.on('player-left', () => {
+      setGameStatus('waiting');
+      setOpponent(null);
+    });
 
     // Cleanup
     return () => {
-      newSocket.disconnect();
+      socket.off('room-update');
+      socket.off('game-start');
+      socket.off('error-message');
+      socket.off('player-left');
     };
-  }, [roomId, playerName, isHost]);
+  }, [socket]);
 
-  // Tampilkan loading saat koneksi
-  if (connecting) {
+  // Render loading state
+  if (isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen p-4">
-        <motion.div
-          className="card max-w-md w-full text-center"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.5 }}
-        >
-          <motion.div 
-            className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4"
-            animate={{ rotate: 360 }}
-            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-          />
-          <h2 className="text-xl font-medium mb-2">Menghubungkan...</h2>
-          <p className="text-gray-400">Mencoba terhubung ke server game</p>
-        </motion.div>
+      <div className="flex min-h-screen flex-col items-center justify-center p-4">
+        <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+        <p className="mt-4 text-gray-400">Menghubungkan ke server...</p>
       </div>
     );
   }
 
-  // Tampilkan error jika ada
-  if (error) {
+  // Render error message
+  if (errorMessage) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen p-4">
-        <motion.div 
-          className="card max-w-md w-full text-center"
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.5 }}
-        >
-          <motion.div 
-            className="w-16 h-16 rounded-full bg-red-900 mx-auto mb-4 flex items-center justify-center text-2xl"
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            transition={{ duration: 0.3, delay: 0.2 }}
-          >
-            ❌
-          </motion.div>
-          <h2 className="text-xl font-medium mb-2">Error</h2>
-          <p className="text-red-400 mb-4">{error}</p>
-          <motion.button
+      <div className="flex min-h-screen flex-col items-center justify-center p-4">
+        <div className="card max-w-md w-full text-center p-6">
+          <h2 className="text-xl font-bold mb-4 text-red-500">Error</h2>
+          <p className="mb-6">{errorMessage}</p>
+          <button 
             className="btn btn-primary"
-            onClick={() => window.location.href = '/'}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
+            onClick={() => router.push('/')}
           >
             Kembali ke Beranda
-          </motion.button>
-        </motion.div>
+          </button>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen p-4">
-      <div className="w-full max-w-4xl">
-        <motion.header 
-          className="mb-6"
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-        >
-          <div className="flex justify-between items-center">
-            <h1 className="text-2xl font-bold">Tic-Tac-Toe Online</h1>
-            <motion.button
-              className="btn btn-secondary text-sm"
-              onClick={() => window.location.href = '/'}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              Keluar Game
-            </motion.button>
-          </div>
-        </motion.header>
+    <main className="flex min-h-screen flex-col items-center p-4 pt-8 md:p-12">
+      <div className="w-full max-w-5xl">
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-xl font-bold sm:text-2xl">Tic-Tac-Toe Online</h1>
+          <button 
+            className="px-4 py-1.5 bg-card rounded hover:bg-opacity-80 text-sm transition"
+            onClick={() => {
+              if (confirm('Apakah Anda yakin ingin keluar dari game?')) {
+                disconnectSocket(socket);
+                router.push('/');
+              }
+            }}
+          >
+            Keluar
+          </button>
+        </div>
 
-        {room?.status === 'waiting' && (
-          <WaitingRoom
+        {gameStatus === 'waiting' ? (
+          <WaitingRoom 
             socket={socket}
             currentPlayer={currentPlayer}
             opponent={opponent}
             roomId={roomId}
           />
-        )}
-
-        {(room?.status === 'playing' || room?.status === 'finished') && (
-          <GameBoard
+        ) : (
+          <GameBoard 
             socket={socket}
             currentPlayer={currentPlayer}
             opponent={opponent}
-            gameStatus={room.status}
+            gameStatus={gameStatus}
             roomId={roomId}
           />
         )}
       </div>
-    </div>
+    </main>
   );
 } 
