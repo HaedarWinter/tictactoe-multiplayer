@@ -73,7 +73,7 @@ export default function SocketHandler(req: NextApiRequest, res: NextApiResponseW
   // Mengizinkan CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+  res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, X-CSRF-Token, X-Api-Version');
   res.setHeader('Access-Control-Allow-Credentials', 'true');
 
   // Menangani preflight request
