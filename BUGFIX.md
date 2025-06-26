@@ -129,4 +129,78 @@ The migration to Pusher resolved all the Socket.io-related issues:
 
 - [Pusher Documentation](https://pusher.com/docs)
 - [Vercel Documentation on WebSockets](https://vercel.com/guides/using-pusher-with-vercel)
-- [Next.js API Routes](https://nextjs.org/docs/api-routes/introduction) 
+- [Next.js API Routes](https://nextjs.org/docs/api-routes/introduction)
+
+## Recent Issues: 500 Internal Server Errors
+
+After migrating to Pusher, we encountered a new issue:
+
+```
+POST https://tictactoe-multiplayer-drab.vercel.app/api/game/join-room 500 (Internal Server Error)
+Error joining room: Error: Internal server error
+```
+
+### Root Causes:
+
+1. **Missing Environment Variables**: Pusher credentials were not properly set in the Vercel environment
+2. **Error Handling**: The Pusher client and server instances had insufficient error handling
+3. **Deployment Configuration**: The deployment process didn't properly validate the Pusher configuration
+
+### Solutions Implemented:
+
+1. **Improved Error Handling**:
+   - Added a more robust Pusher configuration with fallbacks and error handling
+   - Created a mock Pusher implementation for development environments
+   - Added comprehensive try/catch blocks around all Pusher operations
+   
+2. **SafeTrigger Wrapper**:
+   - Implemented a `safeTrigger` function that wraps Pusher's trigger method
+   - This function catches errors and provides fallbacks when Pusher is unavailable
+   - Ensures the application gracefully handles Pusher failures
+
+3. **Enhanced Logging**:
+   - Added more detailed logging for Pusher-related errors
+   - Improved error messages for easier debugging
+
+4. **Development Mode Support**:
+   - Added special handling for development environments to work without Pusher
+   - Implemented console logs instead of actual Pusher triggers during development
+
+### Required Setup:
+
+To fix this issue permanently, you must:
+
+1. **Create a Pusher Account**:
+   - Sign up at [Pusher](https://pusher.com) and create a Channels app
+   - Note your App ID, Key, Secret, and Cluster
+
+2. **Set Environment Variables on Vercel**:
+   - Go to your Vercel project settings
+   - Add the following environment variables:
+     ```
+     NEXT_PUBLIC_PUSHER_APP_ID=your_app_id
+     NEXT_PUBLIC_PUSHER_KEY=your_key
+     PUSHER_SECRET=your_secret
+     NEXT_PUBLIC_PUSHER_CLUSTER=your_cluster
+     ```
+
+3. **Redeploy Your Application**:
+   - After setting the environment variables, trigger a new deployment
+   - This will ensure the application uses your Pusher credentials
+
+## Testing the Fix
+
+1. **Verify Environment Variables**:
+   - Check your Vercel project settings to ensure all variables are set
+   
+2. **Test Locally**:
+   - Create a `.env.local` file with your Pusher credentials
+   - Run the application locally with `npm run dev`
+   - Verify that the game works as expected
+
+3. **Test Deployed Version**:
+   - Visit your deployed URL
+   - Create a new game room and test with two players
+   - Check browser console for any remaining errors
+
+If you continue to experience issues, please check your Pusher credentials and ensure they are correctly set in your environment variables. 

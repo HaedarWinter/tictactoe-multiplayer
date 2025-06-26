@@ -1,4 +1,4 @@
-import { pusherServer } from '@/lib/pusher';
+import { safeTrigger } from '@/lib/pusher';
 
 // Access the same in-memory storage
 const rooms = new Map();
@@ -59,7 +59,7 @@ export default async function handler(req, res) {
     room.chatHistory.push(startMessage);
 
     // Broadcast game update
-    await pusherServer.trigger(`room-${roomId}`, 'game-update', {
+    await safeTrigger(`room-${roomId}`, 'game-update', {
       board: room.board,
       currentTurn: room.currentTurn,
       status: room.status,
@@ -67,7 +67,7 @@ export default async function handler(req, res) {
     });
 
     // Send chat message
-    await pusherServer.trigger(`room-${roomId}`, 'chat-message', startMessage);
+    await safeTrigger(`room-${roomId}`, 'chat-message', startMessage);
 
     // Return updated game state
     res.status(200).json({

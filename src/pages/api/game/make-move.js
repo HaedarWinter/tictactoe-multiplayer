@@ -1,4 +1,4 @@
-import { pusherServer } from '@/lib/pusher';
+import { safeTrigger } from '@/lib/pusher';
 
 // Access the same in-memory storage as join-room
 const rooms = new Map();
@@ -87,7 +87,7 @@ export default async function handler(req, res) {
     }
 
     // Broadcast game update
-    await pusherServer.trigger(`room-${roomId}`, 'game-update', {
+    await safeTrigger(`room-${roomId}`, 'game-update', {
       board: room.board,
       currentTurn: room.currentTurn,
       status: room.status,

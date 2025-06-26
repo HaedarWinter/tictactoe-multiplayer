@@ -20,8 +20,8 @@ export const gameClient = {
       });
       
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to join room');
+        const errorData = await response.json().catch(() => ({ message: `HTTP error ${response.status}` }));
+        throw new Error(errorData.message || `Failed to join room (${response.status})`);
       }
       
       return response.json();
@@ -46,8 +46,8 @@ export const gameClient = {
       });
       
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to start game');
+        const errorData = await response.json().catch(() => ({ message: `HTTP error ${response.status}` }));
+        throw new Error(errorData.message || `Failed to start game (${response.status})`);
       }
       
       return response.json();
@@ -73,8 +73,8 @@ export const gameClient = {
       });
       
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to make move');
+        const errorData = await response.json().catch(() => ({ message: `HTTP error ${response.status}` }));
+        throw new Error(errorData.message || `Failed to make move (${response.status})`);
       }
       
       return response.json();
@@ -100,8 +100,8 @@ export const gameClient = {
       });
       
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to send message');
+        const errorData = await response.json().catch(() => ({ message: `HTTP error ${response.status}` }));
+        throw new Error(errorData.message || `Failed to send message (${response.status})`);
       }
       
       return response.json();
@@ -118,28 +118,87 @@ export const gameClient = {
    * @returns {object} - Subscription channels
    */
   subscribeToRoom(roomId, callbacks = {}) {
-    const channel = pusherClient.subscribe(`room-${roomId}`);
+    let channel;
     
-    // Room updates (players joining/leaving)
-    if (callbacks.onRoomUpdate) {
-      channel.bind('room-update', callbacks.onRoomUpdate);
-    }
-    
-    // Game updates (moves, game state changes)
-    if (callbacks.onGameUpdate) {
-      channel.bind('game-update', callbacks.onGameUpdate);
-    }
-    
-    // Chat messages
-    if (callbacks.onChatMessage) {
-      channel.bind('chat-message', callbacks.onChatMessage);
+    try {
+      channel = pusherClient.subscribe(`room-${roomId}`);
+      
+      // Connection status events
+      if (callbacks.onConnectionStateChange) {
+        pusherClient.connection.bind('state_change', ({ current }) => {
+          callbacks.onConnectionStateChange(current);
+        });
+      }
+      
+      // Handle subscription errors
+      channel.bind('pusher:subscription_error', (status) => {
+        console.error('Pusher subscription error:', status);
+        if (callbacks.onError) {
+          callbacks.onError(`Failed to subscribe to room events (${status})`);
+        }
+      });
+      
+      // Room updates (players joining/leaving)
+      if (callbacks.onRoomUpdate) {
+        channel.bind('room-update', (data) => {
+          try {
+            callbacks.onRoomUpdate(data);
+          } catch (error) {
+            console.error('Error handling room update:', error);
+          }
+        });
+      }
+      
+      // Game updates (moves, game state changes)
+      if (callbacks.onGameUpdate) {
+        channel.bind('game-update', (data) => {
+          try {
+            callbacks.onGameUpdate(data);
+          } catch (error) {
+            console.error('Error handling game update:', error);
+          }
+        });
+      }
+      
+      // Chat messages
+      if (callbacks.onChatMessage) {
+        channel.bind('chat-message', (data) => {
+          try {
+            callbacks.onChatMessage(data);
+          } catch (error) {
+            console.error('Error handling chat message:', error);
+          }
+        });
+      }
+    } catch (error) {
+      console.error('Error subscribing to room:', error);
+      if (callbacks.onError) {
+        callbacks.onError(`Failed to subscribe to room: ${error.message}`);
+      }
+      
+      // Return dummy unsubscribe function to prevent errors
+      return {
+        channel: null,
+        unsubscribe: () => {}
+      };
     }
     
     return {
       channel,
       unsubscribe: () => {
-        channel.unbind_all();
-        pusherClient.unsubscribe(`room-${roomId}`);
+        try {
+          if (channel) {
+            channel.unbind_all();
+            pusherClient.unsubscribe(`room-${roomId}`);
+          }
+          
+          // Unbind connection state change
+          if (callbacks.onConnectionStateChange) {
+            pusherClient.connection.unbind('state_change');
+          }
+        } catch (error) {
+          console.error('Error unsubscribing from room:', error);
+        }
       }
     };
   }

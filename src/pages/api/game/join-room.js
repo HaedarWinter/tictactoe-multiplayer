@@ -1,4 +1,4 @@
-import { pusherServer } from '@/lib/pusher';
+import { safeTrigger } from '@/lib/pusher';
 
 // In-memory storage for rooms (would use a database in production)
 const rooms = new Map();
@@ -75,13 +75,13 @@ export default async function handler(req, res) {
     }
     
     // Broadcast room update to all clients
-    await pusherServer.trigger(`room-${roomId}`, 'room-update', {
+    await safeTrigger(`room-${roomId}`, 'room-update', {
       players: room.players,
       status: room.status
     });
     
     // Send chat message
-    await pusherServer.trigger(`room-${roomId}`, 'chat-message', joinMessage);
+    await safeTrigger(`room-${roomId}`, 'chat-message', joinMessage);
     
     // Return success with player data
     res.status(200).json({

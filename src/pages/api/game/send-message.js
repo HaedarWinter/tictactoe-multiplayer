@@ -1,4 +1,4 @@
-import { pusherServer } from '@/lib/pusher';
+import { safeTrigger } from '@/lib/pusher';
 
 // Access the same in-memory storage
 const rooms = new Map();
@@ -38,7 +38,7 @@ export default async function handler(req, res) {
     room.chatHistory.push(chatMessage);
 
     // Broadcast message
-    await pusherServer.trigger(`room-${roomId}`, 'chat-message', chatMessage);
+    await safeTrigger(`room-${roomId}`, 'chat-message', chatMessage);
 
     // Return success
     res.status(200).json({
